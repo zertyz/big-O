@@ -3,7 +3,9 @@ mod conditionals;
 mod metrics_allocator;
 mod ring_buffer;
 
-use crate::big_o_analysis::{SetResizingAlgorithmMeasurements, ConstantSetAlgorithmMeasurements, BigOAlgorithmAnalysis, BigOAlgorithmComplexity};
+use crate::big_o_analysis::{
+    types::{BigOAlgorithmComplexity, BigOAlgorithmAnalysis, TimeUnit, TimeUnits, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements},
+};
 use crate::conditionals::OUTPUT;
 
 use std::convert::TryInto;
@@ -12,6 +14,7 @@ use std::time::{SystemTime, Duration};
 use std::io;
 use std::io::Write;
 use std::sync::atomic::{AtomicU32, Ordering};
+use crate::big_o_analysis::types::{BigOTimeMeasurements, BigOSpaceMeasurements, BigOSpacePassMeasurements, BigOTimePassMeasurements, SetResizingAlgorithmPassesInfo, ConstantSetAlgorithmPassesInfo};
 
 pub fn analyze_crud_algorithm<'a,
                               _ResetClosure:  Fn(u32) -> u32 + Sync,
@@ -27,12 +30,12 @@ pub fn analyze_crud_algorithm<'a,
                                                  delete_fn: _DeleteClosure,
                                                  warmup_percentage: u32, create_iterations_per_pass: u32, read_iterations_per_pass: u32, update_iterations_per_pass: u32, delete_iterations_per_pass: u32,
                                                  create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32,
-                                                 time_unit: &TimeUnit<T>)
-        -> (BigOAlgorithmAnalysis<SetResizingAlgorithmMeasurements<'a>>,    // create analysis
-            BigOAlgorithmAnalysis<ConstantSetAlgorithmMeasurements<'a>>,    // read analysis
-            BigOAlgorithmAnalysis<ConstantSetAlgorithmMeasurements<'a>>,    // update analysis
-            BigOAlgorithmAnalysis<SetResizingAlgorithmMeasurements<'a>>,    // delete analysis
-            String) {                                                       // full report
+                                                 time_unit: &'a TimeUnit<T>)
+        -> (BigOAlgorithmAnalysis<SetResizingAlgorithmMeasurements<'a,T>>,    // create analysis
+            BigOAlgorithmAnalysis<ConstantSetAlgorithmMeasurements<'a,T>>,    // read analysis
+            BigOAlgorithmAnalysis<ConstantSetAlgorithmMeasurements<'a,T>>,    // update analysis
+            BigOAlgorithmAnalysis<SetResizingAlgorithmMeasurements<'a,T>>,    // delete analysis
+            String) where PassResult<'a, T>: Copy, T: Copy {                  // full report
 
     let mut full_report = String::new();
 
@@ -43,29 +46,24 @@ pub fn analyze_crud_algorithm<'a,
     };
 
     /// wrap around the original 'run_pass' to output intermediate results
-    fn run_pass_verbosely<_AlgorithmClosure: Fn(u32) -> u32 + Sync,
-                 _OutputClosure:    FnMut(&str),
-                 T: TryInto<u64>> (result_prefix: &str, result_suffix: &str,
-                                   algorithm: &_AlgorithmClosure, algorithm_type: &BigOAlgorithmType, range: Range<u32>, unit: &TimeUnit<T>,
-                                   threads: u32, mut _output: _OutputClosure)
-                -> (PassResult, u32) {
-        _output(&format!("{}", result_prefix));
+    fn run_pass_verbosely<'a,
+                          _AlgorithmClosure: Fn(u32) -> u32 + Sync,
+                          _OutputClosure:    FnMut(&str),
+                          T: TryInto<u64> + Copy> (result_prefix: &str, result_suffix: &str,
+                                                   algorithm: &_AlgorithmClosure, algorithm_type: &BigOAlgorithmType, range: Range<u32>, unit: &'a TimeUnit<T>,
+                                                   threads: u32, mut _output: _OutputClosure)
+                         -> (PassResult<'a,T>, u32) {
         let (pass_result, r) = run_pass(algorithm, algorithm_type, range, unit, threads);
-        let used_memory = pass_result.delta_bytes as f32;   // intermediate results will show the pass resulting used memory (instead of the min/max used mem, used for analysis)
-        let sign = if used_memory > 0.0 {"+"} else {"-"};
-        let memory_unit = if used_memory.abs() > (1<<30) as f32 {"G"}                          else if used_memory.abs() > (1<<20) as f32 {"M"}                                else if used_memory.abs() > (1<<10) as f32 {"K"} else {"b"};
-        let memory_delta = if used_memory.abs() > (1<<30) as f32 { used_memory /(1<<30) as f32} else if used_memory.abs() > (1<<20) as f32 { used_memory.abs() /(1<<20) as f32} else if used_memory.abs() > (1<<10) as f32 { used_memory.abs() /(1<<10) as f32} else { used_memory.abs() };
-        let memory_stats = format!("{}{:.2}{}", sign, memory_delta, memory_unit);
-        _output(&format!("{}{}/{}{}", pass_result.elapsed_time, unit.unit_str, memory_stats, result_suffix));
+        _output(&format!("{}{}/{}{}", result_prefix, pass_result.time_measurements, pass_result.space_measurements, result_suffix));
         (pass_result, r)
     }
 
     const NUMBER_OF_PASSES: u32 = 2;
 
-    let mut create_passes_results = [PassResult{elapsed_time: 0, delta_bytes: 0,  min_max_delta_bytes: 0}; NUMBER_OF_PASSES as usize];
-    let mut   read_passes_results = [PassResult{elapsed_time: 0, delta_bytes: 0,  min_max_delta_bytes: 0}; NUMBER_OF_PASSES as usize];
-    let mut update_passes_results = [PassResult{elapsed_time: 0, delta_bytes: 0,  min_max_delta_bytes: 0}; NUMBER_OF_PASSES as usize];
-    let mut delete_passes_results = [PassResult{elapsed_time: 0, delta_bytes: 0,  min_max_delta_bytes: 0}; NUMBER_OF_PASSES as usize];
+    let mut create_passes_results = [PassResult::<T>::default(); NUMBER_OF_PASSES as usize];
+    let mut   read_passes_results = [PassResult::<T>::default(); NUMBER_OF_PASSES as usize];
+    let mut update_passes_results = [PassResult::<T>::default(); NUMBER_OF_PASSES as usize];
+    let mut delete_passes_results = [PassResult::<T>::default(); NUMBER_OF_PASSES as usize];
 
     // computed result to avoid any call cancellation optimizations when running in release mode
     let mut r: u32 = 0;
@@ -138,35 +136,80 @@ pub fn analyze_crud_algorithm<'a,
     }
     _output("):\n\n");
 
-    // analyze & output "create", "read" and "update" reports
-    let create_analysis = big_o_analysis::analyse_set_resizing_algorithm(SetResizingAlgorithmMeasurements {
+    let read_and_update_passes_info = ConstantSetAlgorithmPassesInfo {
+        pass_1_set_size: create_iterations_per_pass,
+        pass_2_set_size: create_iterations_per_pass * 2,
+        repetitions: read_iterations_per_pass,
+    };
+
+    let create_measurements = SetResizingAlgorithmMeasurements {
         measurement_name: "Create",
-        pass_1_total_time: create_passes_results[0].elapsed_time,
-        pass_2_total_time: create_passes_results[1].elapsed_time,
-        pass_1_max_mem:    create_passes_results[0].min_max_delta_bytes,
-        pass_2_max_mem:    create_passes_results[1].min_max_delta_bytes,
-        delta_set_size:    create_iterations_per_pass
-    });
-    let read_analysis = big_o_analysis::analyse_constant_set_algorithm(ConstantSetAlgorithmMeasurements {
+        passes_info: SetResizingAlgorithmPassesInfo {
+            delta_set_size: create_iterations_per_pass,
+        },
+        time_measurements: BigOTimeMeasurements {
+            pass_1_measurements: create_passes_results[0].time_measurements.clone(),
+            pass_2_measurements: create_passes_results[1].time_measurements,
+        },
+        space_measurements: BigOSpaceMeasurements {
+            pass_1_measurements: create_passes_results[0].space_measurements,
+            pass_2_measurements: create_passes_results[1].space_measurements,
+        },
+    };
+
+    let read_measurements = ConstantSetAlgorithmMeasurements {
         measurement_name: "Read",
-        pass_1_total_time: read_passes_results[0].elapsed_time,
-        pass_2_total_time: read_passes_results[1].elapsed_time,
-        pass_1_max_mem:    read_passes_results[0].min_max_delta_bytes,
-        pass_2_max_mem:    read_passes_results[1].min_max_delta_bytes,
-        pass_1_set_size:   create_iterations_per_pass,
-        pass_2_set_size:   create_iterations_per_pass * 2,
-        repetitions:       read_iterations_per_pass,
-    });
-    let update_analysis = big_o_analysis::analyse_constant_set_algorithm(ConstantSetAlgorithmMeasurements {
+        passes_info: read_and_update_passes_info,
+        time_measurements: BigOTimeMeasurements {
+            pass_1_measurements: read_passes_results[0].time_measurements,
+            pass_2_measurements: read_passes_results[1].time_measurements,
+        },
+        space_measurements: BigOSpaceMeasurements {
+            pass_1_measurements: read_passes_results[0].space_measurements,
+            pass_2_measurements: read_passes_results[1].space_measurements,
+        }
+    };
+
+    let update_measurements = ConstantSetAlgorithmMeasurements {
         measurement_name: "Update",
-        pass_1_total_time: update_passes_results[0].elapsed_time,
-        pass_2_total_time: update_passes_results[1].elapsed_time,
-        pass_1_max_mem:    update_passes_results[0].min_max_delta_bytes,
-        pass_2_max_mem:    update_passes_results[1].min_max_delta_bytes,
-        pass_1_set_size:   create_iterations_per_pass,
-        pass_2_set_size:   create_iterations_per_pass * 2,
-        repetitions: update_iterations_per_pass,
-    });
+        passes_info: read_and_update_passes_info,
+        time_measurements: BigOTimeMeasurements {
+            pass_1_measurements: update_passes_results[0].time_measurements,
+            pass_2_measurements: update_passes_results[1].time_measurements,
+        },
+        space_measurements: BigOSpaceMeasurements {
+            pass_1_measurements: update_passes_results[0].space_measurements,
+            pass_2_measurements: update_passes_results[1].space_measurements,
+        }
+    };
+
+    // time analysis
+    let create_time_complexity = big_o_analysis::time_analysis::analyse_time_complexity_for_set_resizing_algorithm(&create_measurements.passes_info, &create_measurements.time_measurements);
+    let read_time_complexity   = big_o_analysis::time_analysis::analyse_time_complexity_for_constant_set_algorithm(&read_measurements.passes_info, &read_measurements.time_measurements);
+    let update_time_complexity = big_o_analysis::time_analysis::analyse_time_complexity_for_constant_set_algorithm(&update_measurements.passes_info, &update_measurements.time_measurements);
+
+    // space analysis
+    let create_space_complexity = big_o_analysis::space_analysis::analyse_space_complexity_for_set_resizing_algorithm(&create_measurements.passes_info, &create_measurements.space_measurements);
+    let read_space_complexity   = big_o_analysis::space_analysis::analyse_space_complexity_for_constant_set_algorithm(&read_measurements.passes_info, &read_measurements.space_measurements);
+    let update_space_complexity = big_o_analysis::space_analysis::analyse_space_complexity_for_constant_set_algorithm(&update_measurements.passes_info, &update_measurements.space_measurements);
+
+    let create_analysis = BigOAlgorithmAnalysis {
+        algorithm_measurements: create_measurements,
+        time_complexity:        create_time_complexity,
+        space_complexity:       create_space_complexity,
+    };
+    let read_analysis = BigOAlgorithmAnalysis {
+        algorithm_measurements: read_measurements,
+        time_complexity:        read_time_complexity,
+        space_complexity:       read_space_complexity,
+    };
+    let update_analysis = BigOAlgorithmAnalysis {
+        algorithm_measurements: update_measurements,
+        time_complexity:        update_time_complexity,
+        space_complexity:       update_space_complexity,
+    };
+
+    // output "create", "read" and "update" reports
     if create_iterations_per_pass > 0 {
         _output(&format!("{}\n\n", create_analysis));
     }
@@ -186,23 +229,37 @@ pub fn analyze_crud_algorithm<'a,
             } else {
                 "2nd"
             });
-            let (delete_elapsed, dr) = run_pass_verbosely(&msg, "", &delete_fn, &BigOAlgorithmType::SetResizing, calc_regular_D_range(delete_iterations_per_pass, pass), time_unit, delete_threads, &mut _output);
-            delete_passes_results[pass as usize] = delete_elapsed;
+            let (delete_pass, dr) = run_pass_verbosely(&msg, "", &delete_fn, &BigOAlgorithmType::SetResizing, calc_regular_D_range(delete_iterations_per_pass, pass), time_unit, delete_threads, &mut _output);
+            delete_passes_results[pass as usize] = delete_pass;
             r += dr;
         }
     }
 
     _output(&format!(") r={}:\n", r));
 
-    // analyze & output "delete" report
-    let delete_analysis = big_o_analysis::analyse_set_resizing_algorithm(SetResizingAlgorithmMeasurements {
+    let delete_measurements = SetResizingAlgorithmMeasurements {
         measurement_name: "Delete",
-        pass_1_total_time: delete_passes_results[0].elapsed_time,
-        pass_2_total_time: delete_passes_results[1].elapsed_time,
-        pass_1_max_mem:    delete_passes_results[0].min_max_delta_bytes,
-        pass_2_max_mem:    delete_passes_results[1].min_max_delta_bytes,
-        delta_set_size:    delete_iterations_per_pass,
-    });
+        passes_info: SetResizingAlgorithmPassesInfo {
+            delta_set_size: delete_iterations_per_pass,
+        },
+        time_measurements: BigOTimeMeasurements {
+            pass_1_measurements: delete_passes_results[0].time_measurements,
+            pass_2_measurements: delete_passes_results[1].time_measurements,
+        },
+        space_measurements: BigOSpaceMeasurements {
+            pass_1_measurements: delete_passes_results[0].space_measurements,
+            pass_2_measurements: delete_passes_results[1].space_measurements,
+        },
+    };
+
+    // analyze & output "delete" report
+    let delete_time_complexity  = big_o_analysis::time_analysis::analyse_time_complexity_for_set_resizing_algorithm(&delete_measurements.passes_info, &delete_measurements.time_measurements);
+    let delete_space_complexity = big_o_analysis::space_analysis::analyse_space_complexity_for_set_resizing_algorithm(&delete_measurements.passes_info, &delete_measurements.space_measurements);
+    let delete_analysis = BigOAlgorithmAnalysis {
+        algorithm_measurements: delete_measurements,
+        time_complexity:        delete_time_complexity,
+        space_complexity:       delete_space_complexity,
+    };
     if delete_iterations_per_pass > 0 {
         _output(&format!("{}\n\n", delete_analysis));
     }
@@ -235,14 +292,25 @@ macro_rules! assert_complexity {
 }
 
 #[derive(Clone,Copy)]
-struct PassResult {
-    /// unit-less time took to run the pass
-    elapsed_time: u64,
-    /// delta between mem used at the end of the pass and mem used at the beginning of the pass --
-    /// positive if pass mainly allocates, negative if it mainly frees memory.
-    delta_bytes: i32,
-    /// always positive delta between min mem used & max mem used during the pass execution.
-    min_max_delta_bytes: u32,
+pub struct PassResult<'a,ScalarTimeUnit: Copy> {
+    time_measurements:  BigOTimePassMeasurements<'a,ScalarTimeUnit>,
+    space_measurements: BigOSpacePassMeasurements,
+}
+impl<ScalarTimeUnit: Copy> Default for PassResult<'_,ScalarTimeUnit> {
+    fn default() -> Self {
+        Self {
+            time_measurements: BigOTimePassMeasurements {
+                elapsed_time: 0,
+                time_unit: &TimeUnits::getConstDefault(),
+            },
+            space_measurements: BigOSpacePassMeasurements {
+                used_memory_before: 0,
+                used_memory_after:  0,
+                min_used_memory:    0,
+                max_used_memory:    0,
+            }
+        }
+    }
 }
 
 /// Runs a pass on the given 'algorithm' callback function (see [AlgorithmFnPtr]),
@@ -254,9 +322,9 @@ struct PassResult {
 ///     fn algorithm(i: u32) -> u32 {0}
 /// ````
 /// returns: tuple with (elapsed_time: u64, computed_number: u32)
-fn run_pass<_AlgorithmClosure: Fn(u32) -> u32 + Sync, ScalarDuration: TryInto<u64>>
-           (algorithm: &_AlgorithmClosure, algorithm_type: &BigOAlgorithmType, range: Range<u32>, unit: &TimeUnit<ScalarDuration>, threads: u32)
-           -> (PassResult, u32) {
+fn run_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync, ScalarDuration: TryInto<u64> + Copy>
+           (algorithm: &_AlgorithmClosure, algorithm_type: &BigOAlgorithmType, range: Range<u32>, time_unit: &'a TimeUnit<ScalarDuration>, threads: u32)
+           -> (PassResult<'a,ScalarDuration>, u32) {
 
     type ThreadLoopResult = (Duration, u32);
 
@@ -320,7 +388,7 @@ fn run_pass<_AlgorithmClosure: Fn(u32) -> u32 + Sync, ScalarDuration: TryInto<u6
                 panic!("Panic! while running provided 'algorithm' closure: algo type: {:?}, range: {:?}: Error: {:?}", algorithm_type, range, joining_result.unwrap_err())
             }
             let (thread_duration, thread_r) = joining_result.unwrap();
-            let thread_elapsed = (unit.duration_conversion_fn_ptr)(&thread_duration).try_into().unwrap_or_default();
+            let thread_elapsed = (time_unit.duration_conversion_fn_ptr)(&thread_duration).try_into().unwrap_or_default();
             elapsed_average += thread_elapsed as f64 / threads as f64;
             r ^= thread_r;
         }
@@ -328,11 +396,16 @@ fn run_pass<_AlgorithmClosure: Fn(u32) -> u32 + Sync, ScalarDuration: TryInto<u6
         let allocator_statistics = conditionals::ALLOC.delta_statistics(&allocator_savepoint);
 
         (PassResult {
-            elapsed_time: elapsed_average as u64,
-            delta_bytes: ( (allocator_statistics.allocated_bytes + allocator_statistics.reallocated_news_bytes + allocator_statistics.zeroed_allocated_bytes) as isize -
-                           (allocator_statistics.deallocated_bytes + allocator_statistics.reallocated_originals_bytes) as isize) as i32,
-            min_max_delta_bytes: allocator_statistics.max_used_memory as u32 - allocator_statistics.min_used_memory as u32,
-
+            time_measurements:  BigOTimePassMeasurements {
+                elapsed_time: elapsed_average.round() as u64,
+                time_unit,
+            },
+            space_measurements: BigOSpacePassMeasurements {
+                used_memory_before: allocator_savepoint.metrics.current_used_memory,
+                used_memory_after:  allocator_statistics.current_used_memory,
+                min_used_memory:    allocator_statistics.min_used_memory,
+                max_used_memory:    allocator_statistics.max_used_memory,
+            },
         }, r)
 
     }).unwrap()
@@ -347,24 +420,6 @@ pub enum BigOAlgorithmType {
     SetResizing,
     /// the algorithm under analysis doesn't change the data set size it operates on. Examples: queries, sort, fib, ...
     ConstantSet,
-}
-
-/// Specifies a time unit for the 'big-O' crate when measuring / reporting results.
-/// Please use one of the prebuilt 'TimeUnits' constants:
-/// TimeUnits::NANOSECOND, TimeUnits::MICROSECOND,TimeUnits::MILLISECOND,  TimeUnits::SECOND
-pub struct TimeUnit<T> {
-    /// printable unit
-    unit_str: &'static str,
-    /// on std::time::Duration 'as_micros', 'as_seconds', ... function to convert a Duration object into a scalar
-    duration_conversion_fn_ptr: fn(&std::time::Duration) -> T,
-}
-/// prebuilt 'TimeUnit' constants
-struct TimeUnits {}
-impl TimeUnits {
-    pub const NANOSECOND:  TimeUnit<u128> = TimeUnit { unit_str: "ns", duration_conversion_fn_ptr: std::time::Duration::as_nanos};
-    pub const MICROSECOND: TimeUnit<u128> = TimeUnit { unit_str: "µs", duration_conversion_fn_ptr: std::time::Duration::as_micros};
-    pub const MILLISECOND: TimeUnit<u128> = TimeUnit { unit_str: "ms", duration_conversion_fn_ptr: std::time::Duration::as_millis};
-    pub const SECOND:      TimeUnit<u64>  = TimeUnit { unit_str: "s",  duration_conversion_fn_ptr: std::time::Duration::as_secs};
 }
 
 
@@ -382,7 +437,7 @@ mod tests {
     use serial_test::serial;
     use std::sync::Arc;
     use std::collections::HashMap;
-    use crate::big_o_analysis::{BigOTimeMeasurements, BigOAlgorithmComplexity};
+    use crate::big_o_analysis::types::{BigOAlgorithmMeasurements, BigOAlgorithmComplexity};
     use crate::conditionals::ALLOC;
 
     /// Attests that the right report structures are produced for all possible CRUD tests:
@@ -402,10 +457,10 @@ mod tests {
         fn assert_does_not_contain_status(report: &str, excerpt: &str) {
             assert!(!report.contains(excerpt), "found '{}' status on the full report, where it shouldn't be", excerpt);
         }
-        fn assert_contains_algorithm_report<T: BigOTimeMeasurements>(report: &str, algorithm_analysis: BigOAlgorithmAnalysis<T>, algorithm_name: &str) {
+        fn assert_contains_algorithm_report<T: BigOAlgorithmMeasurements>(report: &str, algorithm_analysis: BigOAlgorithmAnalysis<T>, algorithm_name: &str) {
             assert!(report.contains(&algorithm_analysis.to_string()), "couldn't find '{}' report analysis on the full report", algorithm_name);
         }
-        fn assert_does_not_contain_algorithm_report<T: BigOTimeMeasurements>(report: &str, algorithm_analysis: BigOAlgorithmAnalysis<T>, algorithm_name: &str) {
+        fn assert_does_not_contain_algorithm_report<T: BigOAlgorithmMeasurements>(report: &str, algorithm_analysis: BigOAlgorithmAnalysis<T>, algorithm_name: &str) {
             assert!(!report.contains(&algorithm_analysis.to_string()), "found a '{}' report analysis that shouldn't be on the full report", algorithm_name);
         }
 
