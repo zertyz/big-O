@@ -148,7 +148,7 @@ pub fn analyze_crud_algorithm<'a,
             delta_set_size: create_iterations_per_pass,
         },
         time_measurements: BigOTimeMeasurements {
-            pass_1_measurements: create_passes_results[0].time_measurements.clone(),
+            pass_1_measurements: create_passes_results[0].time_measurements,
             pass_2_measurements: create_passes_results[1].time_measurements,
         },
         space_measurements: BigOSpaceMeasurements {
@@ -185,12 +185,12 @@ pub fn analyze_crud_algorithm<'a,
 
     // time analysis
     let create_time_complexity = big_o_analysis::time_analysis::analyse_time_complexity_for_set_resizing_algorithm(&create_measurements.passes_info, &create_measurements.time_measurements);
-    let read_time_complexity   = big_o_analysis::time_analysis::analyse_time_complexity_for_constant_set_algorithm(&read_measurements.passes_info, &read_measurements.time_measurements);
+    let read_time_complexity   = big_o_analysis::time_analysis::analyse_time_complexity_for_constant_set_algorithm(&read_measurements.passes_info,   &read_measurements.time_measurements);
     let update_time_complexity = big_o_analysis::time_analysis::analyse_time_complexity_for_constant_set_algorithm(&update_measurements.passes_info, &update_measurements.time_measurements);
 
     // space analysis
     let create_space_complexity = big_o_analysis::space_analysis::analyse_space_complexity_for_set_resizing_algorithm(&create_measurements.passes_info, &create_measurements.space_measurements);
-    let read_space_complexity   = big_o_analysis::space_analysis::analyse_space_complexity_for_constant_set_algorithm(&read_measurements.passes_info, &read_measurements.space_measurements);
+    let read_space_complexity   = big_o_analysis::space_analysis::analyse_space_complexity_for_constant_set_algorithm(&read_measurements.passes_info,   &read_measurements.space_measurements);
     let update_space_complexity = big_o_analysis::space_analysis::analyse_space_complexity_for_constant_set_algorithm(&update_measurements.passes_info, &update_measurements.space_measurements);
 
     let create_analysis = BigOAlgorithmAnalysis {

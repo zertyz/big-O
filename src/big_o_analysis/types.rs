@@ -11,15 +11,12 @@ pub struct BigOAlgorithmAnalysis<T: BigOAlgorithmMeasurements> {
 }
 impl<T: BigOAlgorithmMeasurements> Display for BigOAlgorithmAnalysis<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut fmt = || write!(f, "{}--> Algorithm  Time Analysis: {}\n--> Algorithm Space Analysis: {}\n", self.algorithm_measurements, self.time_complexity.as_time_pretty_str(), self.space_complexity.as_space_pretty_str());
-        match self.time_complexity {
-            BigOAlgorithmComplexity::BetterThanO1      => fmt(),
-            BigOAlgorithmComplexity::O1                => fmt(),
-            BigOAlgorithmComplexity::OLogN             => fmt(),
-            BigOAlgorithmComplexity::BetweenOLogNAndON => fmt(),
-            BigOAlgorithmComplexity::ON                => fmt(),
-            BigOAlgorithmComplexity::WorseThanON       => fmt(),
-        }
+        write!(f, "{}\
+                   --> Algorithm  Time Analysis: {}\n\
+                   --> Algorithm Space Analysis: {} ({space_measurements})\n",
+               self.algorithm_measurements,
+               self.time_complexity.as_time_pretty_str(),
+               self.space_complexity.as_space_pretty_str(), space_measurements=self.algorithm_measurements.space_measurements())
     }
 }
 
@@ -87,9 +84,40 @@ pub struct BigOSpaceMeasurements {
     pub pass_1_measurements: BigOSpacePassMeasurements,
     pub pass_2_measurements: BigOSpacePassMeasurements,
 }
+impl BigOSpaceMeasurements {
+    /// returns the resulting used memory, obtained from the space complexity analysis measurements --
+    /// >0 if memory was allocated and <0 if memory was freed
+    pub fn used_memory_delta(&self) -> isize {
+        self.pass_2_measurements.used_memory_after as isize - self.pass_2_measurements.used_memory_before as isize +
+        self.pass_1_measurements.used_memory_after as isize - self.pass_1_measurements.used_memory_before as isize
+    }
+    /// auxiliary space refers to the memory used during the computation and then freed before ending the computation --
+    /// returns max_used_ram - max(used_memory_delta, used_memory_start), meaning: >0 if auxiliary memory was allocated
+    pub fn used_auxiliary_space(&self) -> usize {
+        self.pass_2_measurements.max_used_memory - std::cmp::max(self.pass_2_measurements.used_memory_after, self.pass_2_measurements.used_memory_before) +
+        self.pass_1_measurements.max_used_memory - std::cmp::max(self.pass_1_measurements.used_memory_after, self.pass_1_measurements.used_memory_before)
+    }
+}
 impl Default for BigOSpaceMeasurements {
     fn default() -> Self {
         Self { pass_1_measurements: BigOSpacePassMeasurements::default(), pass_2_measurements: BigOSpacePassMeasurements::default() }
+    }
+}
+impl Display for BigOSpaceMeasurements {
+    // shows allocated / deallocated amount + any used auxiliary space
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        fn to_human_readable_string(used_memory: f32) -> String {
+            let memory_unit = if used_memory > (1<<30) as f32 {"GiB"}                        else if used_memory > (1<<20) as f32 {"MiB"}                        else if used_memory > (1<<10) as f32 {"KiB"}                        else {"b"};
+            let memory_delta = if used_memory > (1<<30) as f32 {used_memory / (1<<30) as f32} else if used_memory > (1<<20) as f32 {used_memory / (1<<20) as f32} else if used_memory > (1<<10) as f32 {used_memory / (1<<10) as f32} else {used_memory};
+            format!("{:.2}{}", memory_delta, memory_unit)
+        }
+        let used_or_freed = self.used_memory_delta();
+        let alloc_op = if used_or_freed >= 0 { "allocated" } else { "freed" };
+        let used_auxiliary_space = self.used_auxiliary_space();
+        write!(f, "{}: {}; auxiliary used space: {}",
+               alloc_op,
+               to_human_readable_string(used_or_freed.abs() as f32),
+               to_human_readable_string(used_auxiliary_space as f32))
     }
 }
 
@@ -106,11 +134,12 @@ pub struct BigOSpacePassMeasurements {
     pub min_used_memory:    usize,
 }
 impl Display for BigOSpacePassMeasurements {
-    /// shows a summary -- just the used or freed memory, with b, KiB, MiB or GiB unit
+    // shows a summary -- just the used or freed memory, with b, KiB, MiB or GiB unit
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let used_memory = self.used_memory_after as f32 - self.used_memory_before as f32;
         let sign = if used_memory > 0.0 {"+"} else if used_memory < 0.0 {"-"} else {""};
-        let used_memory = (self.max_used_memory - self.min_used_memory) as f32;
+        let used_memory = std::cmp::max( (self.max_used_memory    - self.used_memory_before),
+                                              (self.used_memory_before - self.min_used_memory)) as f32;
         let memory_unit = if used_memory.abs() > (1<<30) as f32 {"GiB"}                        else if used_memory.abs() > (1<<20) as f32 {"MiB"}                              else if used_memory.abs() > (1<<10) as f32 {"KiB"}                              else {"b"};
         let memory_delta = if used_memory.abs() > (1<<30) as f32 {used_memory / (1<<30) as f32} else if used_memory.abs() > (1<<20) as f32 {used_memory.abs() / (1<<20) as f32} else if used_memory.abs() > (1<<10) as f32 {used_memory.abs() / (1<<10) as f32} else {used_memory.abs()};
         write!(f, "{}{:.2}{}", sign, memory_delta, memory_unit)
@@ -129,7 +158,9 @@ impl Default for BigOSpacePassMeasurements {
 
 /// base trait for [SetResizingAlgorithmMeasurements] & [ConstantSetAlgorithmMeasurements], made public
 /// to attend to rustc's rules. Most probably this trait is of no use outside it's own module.
-pub trait BigOAlgorithmMeasurements: Display {}
+pub trait BigOAlgorithmMeasurements: Display {
+    fn space_measurements(&self) -> &BigOSpaceMeasurements;
+}
 
 pub struct ConstantSetAlgorithmMeasurements<'a,ScalarTimeUnit: Copy> {
     /// a name for this measurement, for presentation purposes
@@ -139,7 +170,11 @@ pub struct ConstantSetAlgorithmMeasurements<'a,ScalarTimeUnit: Copy> {
     pub time_measurements:  BigOTimeMeasurements<'a,ScalarTimeUnit>,
     pub space_measurements: BigOSpaceMeasurements,
 }
-impl<'a,ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for ConstantSetAlgorithmMeasurements<'a,ScalarTimeUnit> {}
+impl<'a,ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for ConstantSetAlgorithmMeasurements<'a,ScalarTimeUnit> {
+    fn space_measurements(&self) -> &BigOSpaceMeasurements {
+        &self.space_measurements
+    }
+}
 impl<'a,ScalarTimeUnit: Copy> Display for ConstantSetAlgorithmMeasurements<'a,ScalarTimeUnit> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // placing those in string variables since {:>12} seem not to work on implementers of Display
@@ -171,7 +206,11 @@ pub struct SetResizingAlgorithmMeasurements<'a,ScalarTimeUnit: Copy> {
     pub time_measurements:  BigOTimeMeasurements<'a,ScalarTimeUnit>,
     pub space_measurements: BigOSpaceMeasurements,
 }
-impl<'a,ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for SetResizingAlgorithmMeasurements<'a,ScalarTimeUnit> {}
+impl<'a,ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for SetResizingAlgorithmMeasurements<'a,ScalarTimeUnit> {
+    fn space_measurements(&self) -> &BigOSpaceMeasurements {
+        &self.space_measurements
+    }
+}
 impl<'a,ScalarTimeUnit: Copy> Display for SetResizingAlgorithmMeasurements<'a,ScalarTimeUnit> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // placing those in string variables since {:>12} seem not to work on implementers of Display
