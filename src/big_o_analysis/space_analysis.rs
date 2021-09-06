@@ -18,8 +18,8 @@ pub fn analyse_space_complexity_for_constant_set_algorithm(passes_info:  &Consta
                                                            measurements: &BigOSpaceMeasurements) -> BigOAlgorithmComplexity {
 
     // max mem used
-    let s1 = (measurements.pass_1_measurements.max_used_memory as f64 - measurements.pass_1_measurements.used_memory_before as f64);
-    let s2 = (measurements.pass_2_measurements.max_used_memory as f64 - measurements.pass_2_measurements.used_memory_before as f64);
+    let s1 = measurements.pass_1_measurements.max_used_memory as f64 - measurements.pass_1_measurements.used_memory_before as f64;
+    let s2 = measurements.pass_2_measurements.max_used_memory as f64 - measurements.pass_2_measurements.used_memory_before as f64;
 
     // set size variation
     let n1 = std::cmp::min(passes_info.pass_1_set_size, passes_info.pass_2_set_size) as f64;

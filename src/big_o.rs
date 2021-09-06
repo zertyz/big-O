@@ -1,20 +1,16 @@
-pub mod big_o_analysis;
-mod conditionals;
-mod metrics_allocator;
-mod ring_buffer;
-
 use crate::big_o_analysis::{
-    types::{BigOAlgorithmComplexity, BigOAlgorithmAnalysis, TimeUnit, TimeUnits, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements},
+    self,
+    types::{BigOAlgorithmAnalysis, TimeUnit, TimeUnits, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
+            BigOTimeMeasurements, BigOSpaceMeasurements, BigOSpacePassMeasurements, BigOTimePassMeasurements,
+            SetResizingAlgorithmPassesInfo, ConstantSetAlgorithmPassesInfo},
 };
-use crate::conditionals::OUTPUT;
+use crate::conditionals::{self,OUTPUT};
 
 use std::convert::TryInto;
 use std::ops::Range;
 use std::time::{SystemTime, Duration};
 use std::io;
 use std::io::Write;
-use std::sync::atomic::{AtomicU32, Ordering};
-use crate::big_o_analysis::types::{BigOTimeMeasurements, BigOSpaceMeasurements, BigOSpacePassMeasurements, BigOTimePassMeasurements, SetResizingAlgorithmPassesInfo, ConstantSetAlgorithmPassesInfo};
 
 pub fn analyze_crud_algorithm<'a,
                               _ResetClosure:  Fn(u32) -> u32 + Sync,
@@ -71,10 +67,10 @@ pub fn analyze_crud_algorithm<'a,
     _output(&format!("{} CRUD Algorithm Complexity Analysis:\n  ", crud_name));
 
     // range calculation
-    fn calc_regular_CRU_range(iterations_per_pass: u32, pass_number: u32) -> Range<u32> { iterations_per_pass * pass_number       .. iterations_per_pass * (pass_number + 1) }
-    fn calc_regular_D_range  (iterations_per_pass: u32, pass_number: u32) -> Range<u32> { iterations_per_pass * (pass_number + 1) .. iterations_per_pass * pass_number }
-    let calc_warmup_CRU_range = |iterations_per_pass|  0 .. iterations_per_pass * warmup_percentage / 100;
-    let calc_warmup_D_range   = |iterations_per_pass| iterations_per_pass * warmup_percentage / 100 .. 0;
+    fn calc_regular_cru_range(iterations_per_pass: u32, pass_number: u32) -> Range<u32> { iterations_per_pass * pass_number       .. iterations_per_pass * (pass_number + 1) }
+    fn calc_regular_d_range(iterations_per_pass: u32, pass_number: u32) -> Range<u32> { iterations_per_pass * (pass_number + 1) .. iterations_per_pass * pass_number }
+    let calc_warmup_cru_range = |iterations_per_pass|  0 .. iterations_per_pass * warmup_percentage / 100;
+    let calc_warmup_d_range = |iterations_per_pass| iterations_per_pass * warmup_percentage / 100 .. 0;
 
 
     // now the real deal: run the passes & CRUD operations
@@ -88,23 +84,22 @@ pub fn analyze_crud_algorithm<'a,
             io::stdout().flush().unwrap();
             if create_iterations_per_pass > 0 {
                 _output(&"C");
-                let (_elapse, warmup_r) = run_pass(&create_fn, &BigOAlgorithmType::SetResizing, calc_warmup_CRU_range(create_iterations_per_pass), time_unit, create_threads);
+                let (_elapse, warmup_r) = run_pass(&create_fn, &BigOAlgorithmType::SetResizing, calc_warmup_cru_range(create_iterations_per_pass), time_unit, create_threads);
                 r ^= warmup_r;
             }
             if read_iterations_per_pass > 0 {
                 _output(&"R");
-                let (_elapse, warmup_r) = run_pass(&read_fn, &BigOAlgorithmType::ConstantSet, calc_warmup_CRU_range(read_iterations_per_pass), time_unit, read_threads);
+                let (_elapse, warmup_r) = run_pass(&read_fn, &BigOAlgorithmType::ConstantSet, calc_warmup_cru_range(read_iterations_per_pass), time_unit, read_threads);
                 r ^= warmup_r;
             }
             if update_iterations_per_pass > 0 {
                 _output(&"U");
-                let (_elapse, warmup_r) = run_pass(&update_fn, &BigOAlgorithmType::ConstantSet, calc_warmup_CRU_range(update_iterations_per_pass), time_unit, update_threads);
+                let (_elapse, warmup_r) = run_pass(&update_fn, &BigOAlgorithmType::ConstantSet, calc_warmup_cru_range(update_iterations_per_pass), time_unit, update_threads);
                 r ^= warmup_r;
             }
             if delete_iterations_per_pass > 0 {
-                let delete_range = delete_iterations_per_pass * (pass + 1) .. delete_iterations_per_pass * pass;
                 _output(&"D");
-                let (_elapse, warmup_r) = run_pass(&delete_fn, &BigOAlgorithmType::SetResizing, calc_warmup_D_range(delete_iterations_per_pass), time_unit, delete_threads);
+                let (_elapse, warmup_r) = run_pass(&delete_fn, &BigOAlgorithmType::SetResizing, calc_warmup_d_range(delete_iterations_per_pass), time_unit, delete_threads);
                 r ^= warmup_r;
             }
             reset_fn(warmup_percentage);
@@ -124,9 +119,9 @@ pub fn analyze_crud_algorithm<'a,
         }));
 
         // execute regular passes verbosely
-        let (create_pass, cr) = run_pass_verbosely("create: ",   "", &create_fn, &BigOAlgorithmType::SetResizing, calc_regular_CRU_range(create_iterations_per_pass, pass), time_unit, create_threads, &mut _output);
-        let (read_pass,   rr) = run_pass_verbosely("; read: ",   "", &read_fn,   &BigOAlgorithmType::ConstantSet, calc_regular_CRU_range(  read_iterations_per_pass, pass), time_unit,   read_threads, &mut _output);
-        let (update_pass, ur) = run_pass_verbosely("; update: ", "", &update_fn, &BigOAlgorithmType::ConstantSet, calc_regular_CRU_range(update_iterations_per_pass, pass), time_unit, update_threads, &mut _output);
+        let (create_pass, cr) = run_pass_verbosely("create: ", "", &create_fn, &BigOAlgorithmType::SetResizing, calc_regular_cru_range(create_iterations_per_pass, pass), time_unit, create_threads, &mut _output);
+        let (read_pass,   rr) = run_pass_verbosely("; read: ", "", &read_fn, &BigOAlgorithmType::ConstantSet, calc_regular_cru_range(read_iterations_per_pass, pass), time_unit, read_threads, &mut _output);
+        let (update_pass, ur) = run_pass_verbosely("; update: ", "", &update_fn, &BigOAlgorithmType::ConstantSet, calc_regular_cru_range(update_iterations_per_pass, pass), time_unit, update_threads, &mut _output);
 
         create_passes_results[pass as usize] = create_pass;
           read_passes_results[pass as usize] = read_pass;
@@ -229,7 +224,7 @@ pub fn analyze_crud_algorithm<'a,
             } else {
                 "2nd"
             });
-            let (delete_pass, dr) = run_pass_verbosely(&msg, "", &delete_fn, &BigOAlgorithmType::SetResizing, calc_regular_D_range(delete_iterations_per_pass, pass), time_unit, delete_threads, &mut _output);
+            let (delete_pass, dr) = run_pass_verbosely(&msg, "", &delete_fn, &BigOAlgorithmType::SetResizing, calc_regular_d_range(delete_iterations_per_pass, pass), time_unit, delete_threads, &mut _output);
             delete_passes_results[pass as usize] = delete_pass;
             r += dr;
         }
@@ -293,15 +288,15 @@ macro_rules! assert_complexity {
 
 #[derive(Clone,Copy)]
 pub struct PassResult<'a,ScalarTimeUnit: Copy> {
-    time_measurements:  BigOTimePassMeasurements<'a,ScalarTimeUnit>,
-    space_measurements: BigOSpacePassMeasurements,
+    pub time_measurements:  BigOTimePassMeasurements<'a,ScalarTimeUnit>,
+    pub space_measurements: BigOSpacePassMeasurements,
 }
 impl<ScalarTimeUnit: Copy> Default for PassResult<'_,ScalarTimeUnit> {
     fn default() -> Self {
         Self {
             time_measurements: BigOTimePassMeasurements {
                 elapsed_time: 0,
-                time_unit: &TimeUnits::getConstDefault(),
+                time_unit: &TimeUnits::get_const_default(),
             },
             space_measurements: BigOSpacePassMeasurements {
                 used_memory_before: 0,
@@ -315,14 +310,14 @@ impl<ScalarTimeUnit: Copy> Default for PassResult<'_,ScalarTimeUnit> {
 
 /// Runs a pass on the given 'algorithm' callback function (see [AlgorithmFnPtr]),
 /// measuring (and returning) the time it took to run all iterations specified in 'range'.
-/// ````
+/// ```
 ///     /// Algorithm function under analysis -- receives the iteration number on each call
 ///     /// (for set changing algorithms) or the set size (for constant set algorithms).
 ///     /// Returns any computed number to avoid compiler call cancellation optimizations
 ///     fn algorithm(i: u32) -> u32 {0}
-/// ````
+/// ```
 /// returns: tuple with (elapsed_time: u64, computed_number: u32)
-fn run_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync, ScalarDuration: TryInto<u64> + Copy>
+pub(crate) fn run_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync, ScalarDuration: TryInto<u64> + Copy>
            (algorithm: &_AlgorithmClosure, algorithm_type: &BigOAlgorithmType, range: Range<u32>, time_unit: &'a TimeUnit<ScalarDuration>, threads: u32)
            -> (PassResult<'a,ScalarDuration>, u32) {
 
@@ -423,13 +418,6 @@ pub enum BigOAlgorithmType {
 }
 
 
-fn main() {
-    println!("Welcome to the big-O notation spikes!");
-    println!();
-    //tests::lowLevelExperiments();
-}
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -439,6 +427,7 @@ mod tests {
     use std::collections::HashMap;
     use crate::big_o_analysis::types::{BigOAlgorithmMeasurements, BigOAlgorithmComplexity};
     use crate::conditionals::ALLOC;
+    use std::sync::atomic::{Ordering, AtomicU32};
 
     /// Attests that the right report structures are produced for all possible CRUD tests:
     ///   - progress is reported per pass, per operation (operation = create, read, update or delete)

@@ -138,8 +138,8 @@ impl Display for BigOSpacePassMeasurements {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let used_memory = self.used_memory_after as f32 - self.used_memory_before as f32;
         let sign = if used_memory > 0.0 {"+"} else if used_memory < 0.0 {"-"} else {""};
-        let used_memory = std::cmp::max( (self.max_used_memory    - self.used_memory_before),
-                                              (self.used_memory_before - self.min_used_memory)) as f32;
+        let used_memory = std::cmp::max( self.max_used_memory    - self.used_memory_before,
+                                              self.used_memory_before - self.min_used_memory ) as f32;
         let memory_unit = if used_memory.abs() > (1<<30) as f32 {"GiB"}                        else if used_memory.abs() > (1<<20) as f32 {"MiB"}                              else if used_memory.abs() > (1<<10) as f32 {"KiB"}                              else {"b"};
         let memory_delta = if used_memory.abs() > (1<<30) as f32 {used_memory / (1<<30) as f32} else if used_memory.abs() > (1<<20) as f32 {used_memory.abs() / (1<<20) as f32} else if used_memory.abs() > (1<<10) as f32 {used_memory.abs() / (1<<10) as f32} else {used_memory.abs()};
         write!(f, "{}{:.2}{}", sign, memory_delta, memory_unit)
@@ -283,7 +283,7 @@ impl TimeUnits {
     pub const SECOND:      TimeUnit<u64>  = TimeUnit { unit_str: "s",  duration_conversion_fn_ptr: std::time::Duration::as_secs};
 
     /// returns a reference to the constant default TimeUnit<T> -- acts as a placeholder for mutable variables
-    pub fn getConstDefault<'a,T>() -> &'a TimeUnit<T> {
+    pub fn get_const_default<'a,T>() -> &'a TimeUnit<T> {
         &TimeUnit::<T>::CONST_DEFAULT
     }
 }

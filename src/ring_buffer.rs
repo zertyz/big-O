@@ -8,7 +8,6 @@
 //! Note: the commented out code on this module is a failed attempt to make this class generic, but Rust 1.54 seems, unfortunately,
 //!       to be still incomplete regarding this area (generics & const fn's)
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::error::Error;
 /*use std::mem::MaybeUninit;*/
 
 
@@ -18,8 +17,8 @@ pub const RING_BUFFER_SIZE: usize = 16;
 
 /// Represents a concurrent, zero-copy, zero-cost multiple-consumers Ringer buffer.\
 /// Create a new ring buffer of [u32]s with:
-/// ```rust
-///   let ring_buffer = RingBuffer::<u32>::new();
+/// ```no_compile
+///   let ring_buffer = crate::big_O::ring_buffer::RingBuffer::<u32>::new();
 pub struct RingBuffer<Slot/*, const RING_BUFFER_SIZE: usize*/> {
     /// if ahead of [published_tail], indicates a new slot is being filled in, to soon be published
     reserved_tail: AtomicU32,
@@ -103,8 +102,8 @@ impl<Slot/*, const RING_BUFFER_SIZE: usize*/> RingBuffer<Slot/*, RING_BUFFER_SIZ
 
 
 /// Provides a "reasonably concurrent" ring-buffer consumer, to be created with:
-/// ```rust
-///           let ring_buffer = RingBuffer::new();
+/// ```no_compile
+///           let ring_buffer = crate::big_O::ring_buffer::RingBuffer::new();
 ///           let consumer = ring_buffer.new_consumer();
 /// ```
 /// Concurrency note: since, by design, we can have multiple consumers and, for this very reason, the producer is unaware of
@@ -134,26 +133,25 @@ impl<'a, Slot> RingBufferConsumer<'a, Slot> {
         loop {
             let head = self.head.load(Ordering::Relaxed);
             let published_tail = self.ring_buffer.published_tail.load(Ordering::Relaxed);
-            let reserved_tail = self.ring_buffer.reserved_tail.load(Ordering::Relaxed);
 
-            if head > reserved_tail || head > published_tail || (head == reserved_tail && published_tail != reserved_tail) {
+            if head > published_tail {
                 continue;
             }
-            if published_tail == head {
-                if self.ring_buffer.published_tail.load(Ordering::Relaxed) == published_tail {
+            if head == published_tail {
+                if self.head.load(Ordering::Relaxed) == self.ring_buffer.published_tail.load(Ordering::Relaxed) {
                     return Ok(None);
                 } else {
                     continue;
                 }
             }
-            if reserved_tail - head > RING_BUFFER_SIZE as u32 {
-                if self.head.load(Ordering::Relaxed) == head {
-                    return Err(RingBufferOverflowError { msg: format!("Ring-Buffer overflow: reserved_tail={}, published_tail={}, head={} -- tail could not be farther from head than the ring buffer size of {}", reserved_tail, published_tail, head, RING_BUFFER_SIZE) });
+            if published_tail - head > RING_BUFFER_SIZE as u32 {
+                if self.ring_buffer.published_tail.load(Ordering::Relaxed) - self.head.load(Ordering::Relaxed) > RING_BUFFER_SIZE as u32 {
+                    return Err(RingBufferOverflowError { msg: format!("Ring-Buffer overflow: published_tail={}, head={} -- tail could not be farther from head than the ring buffer size of {}", published_tail, head, RING_BUFFER_SIZE) });
                 } else {
                     continue;
                 }
             }
-            match self.head.compare_exchange(head, head + 1, Ordering::Acquire, Ordering::Relaxed) {
+            match self.head.compare_exchange_weak(head, head + 1, Ordering::Acquire, Ordering::Relaxed) {
                 Ok(_) => return Ok(Some(&self.ring_buffer.buffer[head as usize % RING_BUFFER_SIZE])),
                 Err(_reloaded_val) => continue,
             }
@@ -168,7 +166,7 @@ impl<'a, Slot> RingBufferConsumer<'a, Slot> {
     /// The rather wired return type is to avoid heap allocations: a fixed array of two slices of the
     /// ring buffer are returned -- the second slice is used if the sequence of references cycles
     /// through the buffer. Use this method like the following:
-    /// ```rust
+    /// ```no_compile
     ///   let ring_buffer = RingBuffer::new();
     ///   let consumer = ring_buffer.new_consumer();
     ///   // if you don't care for allocating a vector:
@@ -300,8 +298,8 @@ mod tests {
         let check_name = "ring goes round";
         let expected_elements = &[16,17];
         // consume all but the last, leaving only '16' there
-        for e in 1..RING_BUFFER_SIZE as u32 {
-            consumer.dequeue();
+        for _ in 1..RING_BUFFER_SIZE as u32 {
+            consumer.dequeue().unwrap();
         }
         ring_buffer.enqueue(17);
         assert_eq!(consumer.peek_all()?.concat(), expected_elements, "{} failed", check_name);
@@ -337,7 +335,7 @@ mod tests {
 
         // dequeue
         let element = consumer.dequeue();
-        assert_buffer_overflow("Dequeueing", element, "Ring-Buffer overflow: reserved_tail=17, published_tail=17, head=0 -- tail could not be farther from head than the ring buffer size of 16");
+        assert_buffer_overflow("Dequeueing", element, "Ring-Buffer overflow: published_tail=17, head=0 -- tail could not be farther from head than the ring buffer size of 16");
 
         /// asserts the right error was returned
         fn assert_buffer_overflow<E: Debug>(operation: &str, result: Result<E, RingBufferOverflowError>, expected_error_message: &str) {
@@ -371,7 +369,7 @@ mod tests {
             multi_threaded_iterate(start, finish, threads, |i| ring_buffer.enqueue(i));
 
             let expected_sum = (finish - 1) * (finish - start) / 2;
-            let mut observed_sum = AtomicU32::new(0);
+            let observed_sum = AtomicU32::new(0);
 
             // all-out (consume)
             multi_threaded_iterate(start, finish, threads, |_| match consumer.dequeue() {
@@ -391,10 +389,13 @@ mod tests {
         let finish = 4096;
         let threads = 2;    // might as well be num_cpus::get();
 
-        let expected_sum = (finish - 1) * (finish - start) / 2;
-        let mut observed_sum = AtomicU32::new(0);
+        let expected_sum = (start + (finish-1)) * ( (finish - start) / 2 );
+        let expected_callback_calls = finish - start;
+        let observed_callback_calls = AtomicU32::new(0);
+        let observed_sum = AtomicU32::new(0);
 
         multi_threaded_iterate(start, finish, threads, |i| {
+            observed_callback_calls.fetch_add(1, Ordering::Relaxed);
             // single-in (enqueue)
             ring_buffer.enqueue(i);
             // single-out (dequeue)
@@ -405,19 +406,20 @@ mod tests {
             };
         });
         // check
+        assert_eq!(observed_callback_calls.load(Ordering::Relaxed), expected_callback_calls, "¿Wrong number of callback calls?");
         assert_eq!(observed_sum.load(Ordering::Relaxed), expected_sum, "Error in single-in / single-out multi-threaded test (with {} threads)", threads);
 
         /// iterate from 'start' to 'finish', dividing the work among the given number of 'threads', calling 'callback' on each iteration
         fn multi_threaded_iterate(start: u32, finish: u32, threads: u32, callback: impl Fn(u32) -> () + std::marker::Sync) {
             crossbeam::scope(|scope| {
                 let cb = &callback;
-                let join_handlers: Vec<crossbeam::thread::ScopedJoinHandle<()>> = (0..threads).into_iter()
+                let join_handlers: Vec<crossbeam::thread::ScopedJoinHandle<()>> = (start..start+threads).into_iter()
                     .map(|thread_number| scope.spawn(move |_| iterate(thread_number, finish, threads, &cb)))
                     .collect();
                 for join_handler in join_handlers {
                     join_handler.join().unwrap();
                 }
-            });
+            }).unwrap();
         }
 
         /// iterate from 'start' to 'finish' with the given 'step' size and calls 'callback' on each iteration

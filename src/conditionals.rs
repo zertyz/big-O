@@ -41,7 +41,8 @@ fn null_write(_buf: &str) {
 /// (for which a call to [MetricsAllocatorStatistics.delta_statistics] will still be made)
 const SAVE_POINT_RING_BUFFER_SIZE: usize = 16;
 
-#[cfg(test)]
+//#[cfg(test)]
+// cfg(test) above seems not to work for library crates. That should go into "features", then?
 #[global_allocator]
 /// Custom allocator when running tests
 pub static ALLOC: MetricsAllocator/*<SAVE_POINT_RING_BUFFER_SIZE>*/ = MetricsAllocator::new();

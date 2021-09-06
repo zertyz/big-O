@@ -7,23 +7,23 @@ pub mod types;
 pub mod time_analysis;
 pub mod space_analysis;
 
-use crate::big_o_analysis::types::*;
-use crate::big_o_analysis::time_analysis::*;
-use crate::big_o_analysis::space_analysis::*;
-
 #[cfg(test)]
 mod tests {
 
-    use super::*;
+    use crate::big_o_analysis::types::*;
+    use crate::big_o_analysis::time_analysis::*;
+    use crate::big_o_analysis::space_analysis::*;
 
-    use super::super::{conditionals,BigOAlgorithmType,run_pass,big_o_analysis::{TimeUnit,TimeUnits}};
-    use crate::conditionals::{OUTPUT};
+    use crate::{
+        conditionals::{self,OUTPUT},
+        big_o::{run_pass,PassResult,BigOAlgorithmType},
+        big_o_analysis::types::{TimeUnit,TimeUnits}
+    };
 
     use std::ops::Range;
     use std::convert::TryInto;
 
     use serial_test::serial;
-    use crate::PassResult;
 
     const BUSY_LOOP_DELAY: u32 = 999*conditionals::LOOP_MULTIPLIER;
 
@@ -73,7 +73,7 @@ mod tests {
                 n /= 2;
                 len += 1;
             }
-            let mut vec = Vec::<u32>::with_capacity(len*400);
+            let vec = Vec::<u32>::with_capacity(len*400);
             r ^ (len as u32 + vec.iter().sum::<u32>())
         }
 
@@ -90,14 +90,14 @@ mod tests {
                 n -= 1;
                 len += 1;
             }
-            let mut vec = Vec::<u32>::with_capacity(len);
+            let vec = Vec::<u32>::with_capacity(len);
             r ^ (len as u32 + vec.iter().sum::<u32>())
         }
 
         let assert = |measurement_name, select_function: fn(u32) -> u32, expected_complexity| {
             OUTPUT(&format!("Real '{}' adding {} elements on each pass ", measurement_name, REPETITIONS));
 
-            let (warmup_result, r1) = _run_pass("(warmup: ", "",    select_function, &BigOAlgorithmType::ConstantSet, 0 .. REPETITIONS / 10,                            TIME_UNIT);
+            let (_warmup_result, r1) = _run_pass("(warmup: ", "",    select_function, &BigOAlgorithmType::ConstantSet, 0 .. REPETITIONS / 10,                            TIME_UNIT);
             let (pass_1_result, r2) = _run_pass("; pass1: ", "",    select_function, &BigOAlgorithmType::ConstantSet, 0 .. PASS_1_SET_SIZE,                             TIME_UNIT);
             let (pass_2_result, r3) = _run_pass("; pass2: ", "): ", select_function, &BigOAlgorithmType::ConstantSet, PASS_2_SET_SIZE - REPETITIONS .. PASS_2_SET_SIZE, TIME_UNIT);
 
@@ -165,7 +165,7 @@ mod tests {
             }
             let vec = Vec::<u32>::with_capacity(len as usize);
             r ^ (len + vec.iter().sum::<u32>())
-        };
+        }
 
         /// this would be an O(n/2) function -- the average case for a naive sorted insert... but still O(n). Change n = n-2 to n = n-1 and the analysis will be the same.
         fn o_n_insert(mut n: u32) -> u32 {
@@ -177,13 +177,13 @@ mod tests {
             }
             let vec = Vec::<u32>::with_capacity(len as usize * 400);
             r ^ (len as u32 + vec.iter().sum::<u32>())
-        };
+        }
 
         let assert = |measurement_name, insert_function: fn(u32) -> u32, expected_complexity| {
             OUTPUT(&format!("Real '{}' with {} elements on each pass ", measurement_name, DELTA_SET_SIZE));
 
             /* warmup pass -- container / database should be reset before and after this */
-            let (warmup_result, r1) = _run_pass("(warmup: ", "", insert_function, &BigOAlgorithmType::SetResizing, 0 .. DELTA_SET_SIZE / 10, &TimeUnits::MICROSECOND);
+            let (_warmup_result, r1) = _run_pass("(warmup: ", "", insert_function, &BigOAlgorithmType::SetResizing, 0 .. DELTA_SET_SIZE / 10, &TimeUnits::MICROSECOND);
             /* if we were operating on real data, we would reset the container / database after the warmup, before running pass 1 */
             let (pass_1_result, r2) = _run_pass("; pass1: ", "", insert_function, &BigOAlgorithmType::SetResizing, 0 ..DELTA_SET_SIZE, &TimeUnits::MICROSECOND);
             let (pass_2_result, r3) = _run_pass("; pass2: ", "): ", insert_function, &BigOAlgorithmType::SetResizing, DELTA_SET_SIZE.. DELTA_SET_SIZE * 2, &TimeUnits::MICROSECOND);

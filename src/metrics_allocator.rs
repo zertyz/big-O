@@ -2,22 +2,23 @@
 //! and (min, max) memory usage between two (or more) points in time.
 //!
 //! Activate it with:
-//! ```rust
+//! ```no_compile
+//!     use crate::big_O::metrics_allocator::MetricsAllocator;
 //!     #[global_allocator]
 //!     static ALLOC: MetricsAllocator = MetricsAllocator::new();
 //! ```
 //!
 //! Usage example:
 //! ```rust
+//!    use crate::big_O::conditionals::ALLOC;
 //!     let save_point = ALLOC.save_point();
-//!     let vec = Vec::<u32>::with_capacity(1024);
+//!     let _vec = Vec::<u32>::with_capacity(1024);
 //!     let metrics = ALLOC.delta_statistics(&save_point);
 //!     println!("Allocator Metrics for the Vec allocation: {}", metrics);
 
 use std::fmt::{Formatter, Display};
-use std::sync::atomic::{AtomicUsize, Ordering, AtomicU32};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::alloc::{System, GlobalAlloc, Layout};
-use std::cmp::min;
 
 use crate::ring_buffer::{RingBuffer, RingBufferConsumer};
 
@@ -305,13 +306,13 @@ mod tests {
     use super::*;
 
     use serial_test::serial;
-    use crate::conditionals::ALLOC;
 
     #[test]
     #[serial(cpu)]
     fn usage_example() {
+        use crate::conditionals::ALLOC;
         let save_point = ALLOC.save_point();
-        let vec = Vec::<u32>::with_capacity(1024);
+        let _vec = Vec::<u32>::with_capacity(1024);
         let metrics = ALLOC.delta_statistics(&save_point);
         println!("Allocator Metrics for the Vec allocation: {}", metrics);
     }
