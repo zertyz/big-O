@@ -1,14 +1,166 @@
-//! Contains the "low level" artifacts for analyzing an algorithm's time measurements, in Big-O notation:
-//!   - [analyse_constant_set_algorithm] & [analyse_set_resizing_algorithm] -- functions performing the analysis;
-//!   - [ConstantSetAlgorithmMeasurements] & [SetResizingAlgorithmMeasurements] --structs for holding the measurements;
-//!   - [BigOAlgorithmComplexity] -- analysis result enum & pretty str methods.
+//! Exports time & space algorithm complexity analysis functions, as well as the needed types to operate on them. See:
+//!   - [time_analysis]
+//!   - [space_analysis]
+//!   - [types]
+//!
+//! ... and, most importantly, tests both analysis on real functions. See [tests].
 
 pub mod types;
 pub mod time_analysis;
 pub mod space_analysis;
 
+use crate::{
+    conditionals::{self,OUTPUT},
+    big_o_analysis::{
+        self,
+        types::{BigOAlgorithmAnalysis, TimeUnit, TimeUnits, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
+                BigOTimeMeasurements, BigOSpaceMeasurements, BigOSpacePassMeasurements, BigOTimePassMeasurements,
+                SetResizingAlgorithmPassesInfo, ConstantSetAlgorithmPassesInfo},
+    }
+};
+
+use std::convert::TryInto;
+use std::ops::Range;
+use std::time::{SystemTime, Duration};
+
+
+/// Runs a pass on the given 'algorithm' callback function or closure,
+/// measuring (and returning) the time it took to run all iterations specified in 'range'.
+/// ```
+///     /// Algorithm function under analysis -- receives the iteration number on each call
+///     /// (for set changing algorithms) or the set size (for constant set algorithms).
+///     /// Returns any computed number to avoid compiler call cancellation optimizations
+///     fn algorithm(i: u32) -> u32 {0}
+/// ```
+/// returns: tuple with (elapsed_time: u64, computed_number: u32)
+pub(crate) fn run_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync, ScalarDuration: TryInto<u64> + Copy>
+(algorithm: &_AlgorithmClosure, algorithm_type: &BigOAlgorithmType, range: Range<u32>, time_unit: &'a TimeUnit<ScalarDuration>, threads: u32)
+ -> (PassResult<'a,ScalarDuration>, u32) {
+
+    type ThreadLoopResult = (Duration, u32);
+
+    fn thread_loop<_AlgorithmClosure: Fn(u32) -> u32 + Sync>
+    (algorithm: &_AlgorithmClosure, algorithm_type: &BigOAlgorithmType, range: Range<u32>) -> ThreadLoopResult {
+        let mut thread_r: u32 = range.end;
+
+        let thread_start = SystemTime::now();
+
+        // run 'algorithm()' allowing normal or reversed order
+        match algorithm_type {
+            BigOAlgorithmType::ConstantSet => {
+                if range.end < range.start {
+                    for e in (range.end..range.start).rev() {
+                        thread_r ^= algorithm(e);
+                    }
+                } else {
+                    for e in range {
+                        thread_r ^= algorithm(e);
+                    }
+                }
+            },
+            BigOAlgorithmType::SetResizing => {
+                if range.end < range.start {
+                    for e in (range.end..range.start).rev() {
+                        thread_r ^= algorithm(e);
+                    }
+                } else {
+                    for e in range {
+                        thread_r ^= algorithm(e);
+                    }
+                }
+            },
+        }
+
+        let thread_end = SystemTime::now();
+        let thread_duration = thread_end.duration_since(thread_start).unwrap();
+
+        (thread_duration, thread_r)
+    }
+
+    // use crossbeam's scoped threads to avoid requiring a 'static lifetime for our algorithm closure
+    crossbeam::scope(|scope| {
+
+        // start all threads
+        let i32_range = range.end as i32 .. range.start as i32;
+        let chunk_size = (i32_range.end-i32_range.start)/threads as i32;
+        let mut thread_handlers: Vec<crossbeam::thread::ScopedJoinHandle<ThreadLoopResult>> = Vec::with_capacity(threads as usize);
+        let allocator_savepoint = conditionals::ALLOC.save_point();
+        for n in 0..threads as i32 {
+            let chunked_range = i32_range.start+chunk_size*n..i32_range.start+chunk_size*(n+1);
+            thread_handlers.push( scope.spawn(move |_| thread_loop(algorithm, algorithm_type, chunked_range.start as u32 .. chunked_range.end as u32)) );
+        }
+
+        // wait for them all to finish
+        let mut r = range.start+1;
+        let mut elapsed_average = 0.0f64;
+        for handler in thread_handlers {
+            let joining_result = handler.join();
+            if joining_result.is_err() {
+                panic!("Panic! while running provided 'algorithm' closure: algo type: {:?}, range: {:?}: Error: {:?}", algorithm_type, range, joining_result.unwrap_err())
+            }
+            let (thread_duration, thread_r) = joining_result.unwrap();
+            let thread_elapsed = (time_unit.duration_conversion_fn_ptr)(&thread_duration).try_into().unwrap_or_default();
+            elapsed_average += thread_elapsed as f64 / threads as f64;
+            r ^= thread_r;
+        }
+
+        let allocator_statistics = conditionals::ALLOC.delta_statistics(&allocator_savepoint);
+
+        (PassResult {
+            time_measurements:  BigOTimePassMeasurements {
+                elapsed_time: elapsed_average.round() as u64,
+                time_unit,
+            },
+            space_measurements: BigOSpacePassMeasurements {
+                used_memory_before: allocator_savepoint.metrics.current_used_memory,
+                used_memory_after:  allocator_statistics.current_used_memory,
+                min_used_memory:    allocator_statistics.min_used_memory,
+                max_used_memory:    allocator_statistics.max_used_memory,
+            },
+        }, r)
+
+    }).unwrap()
+
+}
+
+/// contains the measurements for a pass done in [run_pass()]
+#[derive(Clone,Copy)]
+pub struct PassResult<'a,ScalarTimeUnit: Copy> {
+    pub time_measurements:  BigOTimePassMeasurements<'a,ScalarTimeUnit>,
+    pub space_measurements: BigOSpacePassMeasurements,
+}
+impl<ScalarTimeUnit: Copy> Default for PassResult<'_,ScalarTimeUnit> {
+    fn default() -> Self {
+        Self {
+            time_measurements: BigOTimePassMeasurements {
+                elapsed_time: 0,
+                time_unit: &TimeUnits::get_const_default(),
+            },
+            space_measurements: BigOSpacePassMeasurements {
+                used_memory_before: 0,
+                used_memory_after:  0,
+                min_used_memory:    0,
+                max_used_memory:    0,
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+/// Specifies if the algorithm under analysis alters the data set it works on or if it has no side-effects on it
+/// Different math applies on each case, as well as different parameters to the 'algorithm(u32) -> u32' function.
+pub enum BigOAlgorithmType {
+    /// the algorithm under analysis change the data set size it operates on. Examples: insert/delete, enqueue/dequeue, ...
+    SetResizing,
+    /// the algorithm under analysis doesn't change the data set size it operates on. Examples: queries, sort, fib, ...
+    ConstantSet,
+}
+
+
 #[cfg(test)]
 mod tests {
+
+    use super::*;
 
     use crate::big_o_analysis::types::*;
     use crate::big_o_analysis::time_analysis::*;
@@ -16,7 +168,6 @@ mod tests {
 
     use crate::{
         conditionals::{self,OUTPUT},
-        big_o::{run_pass,PassResult,BigOAlgorithmType},
         big_o_analysis::types::{TimeUnit,TimeUnits}
     };
 
@@ -27,6 +178,7 @@ mod tests {
 
     const BUSY_LOOP_DELAY: u32 = 999*conditionals::LOOP_MULTIPLIER;
 
+    /// assures serializations & implementors of [Display] from [types] work as they should
     #[test]
     #[serial(cpu)]
     fn serialization() {
@@ -45,6 +197,7 @@ mod tests {
         OUTPUT("\n");
     }
 
+    /// tests time & space complexity analysis on real constant set algorithms
     #[test]
     #[serial(cpu)]
     fn analyse_constant_set_algorithm_real_test() {
@@ -143,6 +296,7 @@ mod tests {
 
     }
 
+    /// tests time & space complexity analysis on real set resizing algorithms
     #[test]
     #[serial(cpu)]
     fn analyse_set_resizing_algorithm_real_test() {
