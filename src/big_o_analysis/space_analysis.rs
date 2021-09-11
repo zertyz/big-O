@@ -99,6 +99,7 @@ mod tests {
 
     use serial_test::serial;
 
+    /// test the space complexity analysis results based on some known-to-be-correct measurement sizes
     #[test]
     #[serial(cpu)]
     fn analyse_constant_set_algorithm_theoretical_test() {
@@ -212,6 +213,7 @@ mod tests {
 
     }
 
+    /// test the space complexity analysis results based on some known-to-be-correct measurement sizes
     #[test]
     #[serial(cpu)]
     fn analyse_set_resizing_algorithm_theoretical_test() {
@@ -332,6 +334,7 @@ mod tests {
                });
     }
 
+    /// test the space complexity analysis results progression when measurements increase
     #[test]
     #[serial(cpu)]
     fn smooth_transitions() {

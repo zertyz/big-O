@@ -1,7 +1,6 @@
-use std::fmt::{Display, Formatter};
+//! Defines traits, enums & structs returned / shared by this crate's functions.
 
-/// acceptable variance / measurement errors when measuring algorithm's execution times & used space
-pub const PERCENT_TOLERANCE: f64 = 0.10;
+use std::fmt::{Display, Formatter};
 
 /// return result for this module's main functions [analyse_constant_set_algorithm] & [analyse_set_resizing_algorithm]
 pub struct BigOAlgorithmAnalysis<T: BigOAlgorithmMeasurements> {
@@ -20,7 +19,10 @@ impl<T: BigOAlgorithmMeasurements> Display for BigOAlgorithmAnalysis<T> {
     }
 }
 
-/// possible time & space complexity analysis results, in big-O notation
+/// Possible time & space complexity analysis results, in big-O notation.
+/// Results are for a single operation -- remember a pass have several operations,
+/// so the time for the analysis should have '* 2 * p' added -- 'p' being the size
+/// for each one of the 2 passes required for the analysis.
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BigOAlgorithmComplexity {
     BetterThanO1,
@@ -50,108 +52,12 @@ impl BigOAlgorithmComplexity {
             _ => self.as_pretty_str(),
         }
     }
-    /// verbose description for each enum element, provided we're analysing space
+    /// verbose description for each enum element, provided we're analysing space complexity
     pub fn as_space_pretty_str(&self) -> &'static str {
         match self {
             Self::BetterThanO1      => "Better than O(1) -- are initialization allocations involved? Consider using a warm up pass",
             Self::WorseThanON       => "Worse than O(n) -- really, really bad algorithm or is there a hidden bug?",
             _ => self.as_pretty_str(),
-        }
-    }
-}
-
-/// represents an algorithm's run-time time measurements, so that it can have it's time complexity analyzed
-pub struct BigOTimeMeasurements<'a,ScalarTimeUnit: Copy> {
-    pub pass_1_measurements: BigOTimePassMeasurements<'a,ScalarTimeUnit>,
-    pub pass_2_measurements: BigOTimePassMeasurements<'a,ScalarTimeUnit>,
-}
-
-#[derive(Clone,Copy)]
-pub struct BigOTimePassMeasurements<'a,ScalarTimeUnit> where ScalarTimeUnit: Clone+Copy {
-    /// the time it took to run a pass
-    pub elapsed_time: u64,
-    /// unit for the measurements in this struct
-    pub time_unit: &'a TimeUnit<ScalarTimeUnit>,
-}
-impl<ScalarTimeUnit: Copy> Display for BigOTimePassMeasurements<'_,ScalarTimeUnit> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", self.elapsed_time, self.time_unit.unit_str)
-    }
-}
-
-/// represents an algorithm's run-time memory usage measurements, in bytes, so that it can have it's space complexity analyzed
-pub struct BigOSpaceMeasurements {
-    pub pass_1_measurements: BigOSpacePassMeasurements,
-    pub pass_2_measurements: BigOSpacePassMeasurements,
-}
-impl BigOSpaceMeasurements {
-    /// returns the resulting used memory, obtained from the space complexity analysis measurements --
-    /// >0 if memory was allocated and <0 if memory was freed
-    pub fn used_memory_delta(&self) -> isize {
-        self.pass_2_measurements.used_memory_after as isize - self.pass_2_measurements.used_memory_before as isize +
-        self.pass_1_measurements.used_memory_after as isize - self.pass_1_measurements.used_memory_before as isize
-    }
-    /// auxiliary space refers to the memory used during the computation and then freed before ending the computation --
-    /// returns max_used_ram - max(used_memory_delta, used_memory_start), meaning: >0 if auxiliary memory was allocated
-    pub fn used_auxiliary_space(&self) -> usize {
-        self.pass_2_measurements.max_used_memory - std::cmp::max(self.pass_2_measurements.used_memory_after, self.pass_2_measurements.used_memory_before) +
-        self.pass_1_measurements.max_used_memory - std::cmp::max(self.pass_1_measurements.used_memory_after, self.pass_1_measurements.used_memory_before)
-    }
-}
-impl Default for BigOSpaceMeasurements {
-    fn default() -> Self {
-        Self { pass_1_measurements: BigOSpacePassMeasurements::default(), pass_2_measurements: BigOSpacePassMeasurements::default() }
-    }
-}
-impl Display for BigOSpaceMeasurements {
-    // shows allocated / deallocated amount + any used auxiliary space
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        fn to_human_readable_string(used_memory: f32) -> String {
-            let memory_unit = if used_memory > (1<<30) as f32 {"GiB"}                        else if used_memory > (1<<20) as f32 {"MiB"}                        else if used_memory > (1<<10) as f32 {"KiB"}                        else {"b"};
-            let memory_delta = if used_memory > (1<<30) as f32 {used_memory / (1<<30) as f32} else if used_memory > (1<<20) as f32 {used_memory / (1<<20) as f32} else if used_memory > (1<<10) as f32 {used_memory / (1<<10) as f32} else {used_memory};
-            format!("{:.2}{}", memory_delta, memory_unit)
-        }
-        let used_or_freed = self.used_memory_delta();
-        let alloc_op = if used_or_freed >= 0 { "allocated" } else { "freed" };
-        let used_auxiliary_space = self.used_auxiliary_space();
-        write!(f, "{}: {}; auxiliary used space: {}",
-               alloc_op,
-               to_human_readable_string(used_or_freed.abs() as f32),
-               to_human_readable_string(used_auxiliary_space as f32))
-    }
-}
-
-/// memory usage measurements, in bytes, for a pass execution
-#[derive(Debug,Clone,Copy)]
-pub struct BigOSpacePassMeasurements {
-    /// heap memory in use just before starting the pass
-    pub used_memory_before: usize,
-    /// heap memory in use just after the pass execution
-    pub used_memory_after:  usize,
-    /// maximum heap memory in use during the pass execution
-    pub max_used_memory:    usize,
-    /// minimum heap memory in use during the pass execution
-    pub min_used_memory:    usize,
-}
-impl Display for BigOSpacePassMeasurements {
-    // shows a summary -- just the used or freed memory, with b, KiB, MiB or GiB unit
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let used_memory = self.used_memory_after as f32 - self.used_memory_before as f32;
-        let sign = if used_memory > 0.0 {"+"} else if used_memory < 0.0 {"-"} else {""};
-        let used_memory = std::cmp::max( self.max_used_memory    - self.used_memory_before,
-                                              self.used_memory_before - self.min_used_memory ) as f32;
-        let memory_unit = if used_memory.abs() > (1<<30) as f32 {"GiB"}                        else if used_memory.abs() > (1<<20) as f32 {"MiB"}                              else if used_memory.abs() > (1<<10) as f32 {"KiB"}                              else {"b"};
-        let memory_delta = if used_memory.abs() > (1<<30) as f32 {used_memory / (1<<30) as f32} else if used_memory.abs() > (1<<20) as f32 {used_memory.abs() / (1<<20) as f32} else if used_memory.abs() > (1<<10) as f32 {used_memory.abs() / (1<<10) as f32} else {used_memory.abs()};
-        write!(f, "{}{:.2}{}", sign, memory_delta, memory_unit)
-    }
-}
-impl Default for BigOSpacePassMeasurements {
-    fn default() -> Self {
-        Self {
-            used_memory_before: 0,
-            used_memory_after: 0,
-            max_used_memory: 0,
-            min_used_memory: 0,
         }
     }
 }
@@ -162,10 +68,13 @@ pub trait BigOAlgorithmMeasurements: Display {
     fn space_measurements(&self) -> &BigOSpaceMeasurements;
 }
 
+/// Type for [BigOAlgorithmAnalysis::algorithm_measurements] when analyzing algorithms
+/// that do not change the set size they operate on -- select/update, get, sort, fib, ...
+/// See also [SetResizingAlgorithmMeasurements]
 pub struct ConstantSetAlgorithmMeasurements<'a,ScalarTimeUnit: Copy> {
-    /// a name for this measurement, for presentation purposes
+    /// a name for these measurements, for presentation purposes
     pub measurement_name:   &'a str,
-    /// each pass info for use in the time complexity analysis
+    /// each pass info for use in the time & space complexity analysis
     pub passes_info:        ConstantSetAlgorithmPassesInfo,
     pub time_measurements:  BigOTimeMeasurements<'a,ScalarTimeUnit>,
     pub space_measurements: BigOSpaceMeasurements,
@@ -198,10 +107,13 @@ impl<'a,ScalarTimeUnit: Copy> Display for ConstantSetAlgorithmMeasurements<'a,Sc
     }
 }
 
+/// Type for [BigOAlgorithmAnalysis::algorithm_measurements] when analyzing algorithms
+/// that change the set size they operate on -- insert/delete, enqueue/dequeue, push/pop, add/remove, ...
+/// See also [ConstantSetAlgorithmMeasurements]
 pub struct SetResizingAlgorithmMeasurements<'a,ScalarTimeUnit: Copy> {
-    /// a name for this measurement, for presentation purposes
+    /// a name for these measurements, for presentation purposes
     pub measurement_name: &'a str,
-    /// each pass info for use in the time complexity analysis
+    /// each pass info for use in the time & space complexity analysis
     pub passes_info:        SetResizingAlgorithmPassesInfo,
     pub time_measurements:  BigOTimeMeasurements<'a,ScalarTimeUnit>,
     pub space_measurements: BigOSpaceMeasurements,
@@ -228,6 +140,105 @@ impl<'a,ScalarTimeUnit: Copy> Display for SetResizingAlgorithmMeasurements<'a,Sc
     }
 }
 
+/// represents an algorithm's run-time time measurements for passes 1 & 2, so that it can have it's time complexity analyzed
+pub struct BigOTimeMeasurements<'a,ScalarTimeUnit: Copy> {
+    pub pass_1_measurements: BigOTimePassMeasurements<'a,ScalarTimeUnit>,
+    pub pass_2_measurements: BigOTimePassMeasurements<'a,ScalarTimeUnit>,
+}
+
+/// the elapsed time & unit taken to run one of the 2 passes for the algorithm time complexity analysis.
+/// Contained in [BigOTimeMeasurements].
+#[derive(Clone,Copy)]
+pub struct BigOTimePassMeasurements<'a,ScalarTimeUnit> where ScalarTimeUnit: Clone+Copy {
+    /// the time it took to run a pass
+    pub elapsed_time: u64,
+    /// unit for the measurements in this struct
+    pub time_unit: &'a TimeUnit<ScalarTimeUnit>,
+}
+impl<ScalarTimeUnit: Copy> Display for BigOTimePassMeasurements<'_,ScalarTimeUnit> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.elapsed_time, self.time_unit.unit_str)
+    }
+}
+
+/// represents an algorithm's run-time memory usage measurements for passes 1 & 2, in bytes, so that it can have it's space complexity analyzed
+pub struct BigOSpaceMeasurements {
+    pub pass_1_measurements: BigOSpacePassMeasurements,
+    pub pass_2_measurements: BigOSpacePassMeasurements,
+}
+impl BigOSpaceMeasurements {
+    /// returns the resulting used memory, obtained from the space complexity analysis measurements --
+    /// >0 if memory was allocated and <0 if memory was freed
+    pub fn used_memory_delta(&self) -> isize {
+        self.pass_2_measurements.used_memory_after as isize - self.pass_2_measurements.used_memory_before as isize +
+            self.pass_1_measurements.used_memory_after as isize - self.pass_1_measurements.used_memory_before as isize
+    }
+    /// auxiliary space refers to the memory used during the computation and then freed before ending the computation --
+    /// returns max_used_ram - max(used_memory_delta, used_memory_start), meaning: >0 if auxiliary memory was allocated
+    pub fn used_auxiliary_space(&self) -> usize {
+        self.pass_2_measurements.max_used_memory - std::cmp::max(self.pass_2_measurements.used_memory_after, self.pass_2_measurements.used_memory_before) +
+            self.pass_1_measurements.max_used_memory - std::cmp::max(self.pass_1_measurements.used_memory_after, self.pass_1_measurements.used_memory_before)
+    }
+}
+impl Default for BigOSpaceMeasurements {
+    fn default() -> Self {
+        Self { pass_1_measurements: BigOSpacePassMeasurements::default(), pass_2_measurements: BigOSpacePassMeasurements::default() }
+    }
+}
+impl Display for BigOSpaceMeasurements {
+    // shows allocated / deallocated amount + any used auxiliary space
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        fn to_human_readable_string(used_memory: f32) -> String {
+            let memory_unit = if used_memory > (1<<30) as f32 {"GiB"}                        else if used_memory > (1<<20) as f32 {"MiB"}                        else if used_memory > (1<<10) as f32 {"KiB"}                        else {"b"};
+            let memory_delta = if used_memory > (1<<30) as f32 {used_memory / (1<<30) as f32} else if used_memory > (1<<20) as f32 {used_memory / (1<<20) as f32} else if used_memory > (1<<10) as f32 {used_memory / (1<<10) as f32} else {used_memory};
+            format!("{:.2}{}", memory_delta, memory_unit)
+        }
+        let used_or_freed = self.used_memory_delta();
+        let alloc_op = if used_or_freed >= 0 { "allocated" } else { "freed" };
+        let used_auxiliary_space = self.used_auxiliary_space();
+        write!(f, "{}: {}; auxiliary used space: {}",
+               alloc_op,
+               to_human_readable_string(used_or_freed.abs() as f32),
+               to_human_readable_string(used_auxiliary_space as f32))
+    }
+}
+
+/// memory usage measurements, in bytes, for a pass execution -- 2 of them are stored in [BigOSpaceMeasurements]
+/// and are required to perform the space complexity analysis.
+#[derive(Debug,Clone,Copy)]
+pub struct BigOSpacePassMeasurements {
+    /// heap memory in use just before starting the pass
+    pub used_memory_before: usize,
+    /// heap memory in use just after the pass execution
+    pub used_memory_after:  usize,
+    /// maximum heap memory in use during the pass execution
+    pub max_used_memory:    usize,
+    /// minimum heap memory in use during the pass execution
+    pub min_used_memory:    usize,
+}
+impl Display for BigOSpacePassMeasurements {
+    // shows a summary -- just the used or freed memory, with b, KiB, MiB or GiB unit suffixes
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let used_memory = self.used_memory_after as f32 - self.used_memory_before as f32;
+        let sign = if used_memory > 0.0 {"+"} else if used_memory < 0.0 {"-"} else {""};
+        let used_memory = std::cmp::max( self.max_used_memory    - self.used_memory_before,
+                                         self.used_memory_before - self.min_used_memory ) as f32;
+        let memory_unit = if used_memory.abs() > (1<<30) as f32 {"GiB"}                        else if used_memory.abs() > (1<<20) as f32 {"MiB"}                              else if used_memory.abs() > (1<<10) as f32 {"KiB"}                              else {"b"};
+        let memory_delta = if used_memory.abs() > (1<<30) as f32 {used_memory / (1<<30) as f32} else if used_memory.abs() > (1<<20) as f32 {used_memory.abs() / (1<<20) as f32} else if used_memory.abs() > (1<<10) as f32 {used_memory.abs() / (1<<10) as f32} else {used_memory.abs()};
+        write!(f, "{}{:.2}{}", sign, memory_delta, memory_unit)
+    }
+}
+impl Default for BigOSpacePassMeasurements {
+    fn default() -> Self {
+        Self {
+            used_memory_before: 0,
+            used_memory_after: 0,
+            max_used_memory: 0,
+            min_used_memory: 0,
+        }
+    }
+}
+
 /// base type for [ConstantSetAlgorithmPassesInfo] and [SetResizingAlgorithmPassesInfo]
 /// which contains the pass information for the Algorithm's space & time analysis for
 /// each type of algorithm
@@ -237,9 +248,9 @@ pub trait AlgorithmPassesInfo {}
 /// (Selects / Updates / Sort / Fib...)
 #[derive(Clone,Copy)]
 pub struct ConstantSetAlgorithmPassesInfo {
-    /// set size when running "pass 1" (an operation repeated 'repetitions' times)
+    /// set size when running "pass 1"
     pub pass_1_set_size: u32,
-    /// set size when running "pass 2" (an operation repeated 'repetitions' times)
+    /// set size when running "pass 2"
     pub pass_2_set_size: u32,
     /// number of times the algorithm ran on each pass;
     /// each algorithm iteration should behave as executing on the same element without leaving side-effects
@@ -258,15 +269,16 @@ pub struct SetResizingAlgorithmPassesInfo {
 impl AlgorithmPassesInfo for SetResizingAlgorithmPassesInfo {}
 
 /// Specifies a time unit for the 'big-O' crate when measuring / reporting results.
-/// Please use one of the prebuilt 'TimeUnits' constants:
-/// TimeUnits::NANOSECOND, TimeUnits::MICROSECOND,TimeUnits::MILLISECOND,  TimeUnits::SECOND
+/// Please use one of the prebuilt 'TimeUnits' constants instead of instantiating this:
+/// [TimeUnits::NANOSECOND], [TimeUnits::MICROSECOND], [TimeUnits::MILLISECOND],  [TimeUnits::SECOND]
 pub struct TimeUnit<T> {
-    /// printable unit
+    /// printable unit suffix: 'ns', 'µs', etc.
     pub unit_str: &'static str,
-    /// on std::time::Duration 'as_micros', 'as_seconds', ... function to convert a Duration object into a scalar
+    /// one of [std::time::Duration]'s 'as_micros', 'as_seconds', ... function to convert a Duration object into a scalar
     pub(crate) duration_conversion_fn_ptr: fn(&std::time::Duration) -> T,
 }
 impl<T> TimeUnit<T> {
+    /// the same as [Self::default()], from which we can return a read-only reference
     const CONST_DEFAULT: TimeUnit<T> = Self { unit_str: "N/A", duration_conversion_fn_ptr: |_| panic!("use of default TimeUnit") };
 }
 impl<T> Default for TimeUnit<T> {
@@ -274,7 +286,7 @@ impl<T> Default for TimeUnit<T> {
         Self { unit_str: "N/A", duration_conversion_fn_ptr: |_| panic!("use of default TimeUnit") }
     }
 }
-/// prebuilt 'TimeUnit' constants
+/// prebuilt [TimeUnit] constants
 pub struct TimeUnits {}
 impl TimeUnits {
     pub const NANOSECOND:  TimeUnit<u128> = TimeUnit { unit_str: "ns", duration_conversion_fn_ptr: std::time::Duration::as_nanos};
@@ -288,3 +300,5 @@ impl TimeUnits {
     }
 }
 
+/// acceptable variance / measurement errors when analysing algorithm's time & space complexities
+pub(crate) const PERCENT_TOLERANCE: f64 = 0.10;

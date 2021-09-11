@@ -1,14 +1,16 @@
+//! Contains functions to perform Algorithm's Time Complexity Analysis.
+
 use crate::big_o_analysis::types::*;
 
-/// Performs the algorithm analysis for a reasonably large select/update operation (on a database or not).
-/// To perform the analysis, two passes of selects/updates of r elements must be done.
-/// On the first pass, the data set must have 'n1' elements and, on the second pass, 'n2' elements -- 'n2' must be (at least) twice 'n1'.
-/// 'r' should be reasonably large so that end-start can be accurately measured and account for OS, IO and network latencies.
-/// 'start's 1 & 2 and 'end's 1 & 2 are measurement times, regardless of the measurement unit -- milliseconds or microseconds.
-/// The returned algorithm complexity is an indication of the time taken to select/update one element on a data set containing
-/// 'n' elements, where 'O' is the constant of proportionality -- the average time to select/update 1 element.\
-/// Returns: [1] -- the algorithm complexity;\
-///          [2] -- a string with the algorithm analysis report.\
+/// Performs the algorithm analysis based on the 2 passes & measurements given, for an algorithm that does not alter the size of
+/// the set they operate on -- select/update, get, sort, fib...
+///
+/// To perform the analysis, two passes are required on different set sizes -- see [passes_info]. The number of repetitions & set size
+/// must be carefully chosen in order to generate elapsed times (on each pass) high enough to make OS, IO and network latencies
+/// negligible -- if the operation is CPU bounded, the machine should be idle.
+///
+/// The returned algorithm complexity -- in big-O notation -- is an indication of the time taken to execute the algorithm
+/// on one element, in proportion to a set size of 'n' elements. See [BigOAlgorithmComplexity].
 pub fn analyse_time_complexity_for_constant_set_algorithm<ScalarTimeUnit: Copy>(passes_info:  &ConstantSetAlgorithmPassesInfo,
                                                                                 measurements: &BigOTimeMeasurements<ScalarTimeUnit>) -> BigOAlgorithmComplexity {
 
@@ -45,6 +47,15 @@ pub fn analyse_time_complexity_for_constant_set_algorithm<ScalarTimeUnit: Copy>(
     time_complexity
 }
 
+/// Performs the algorithm analysis based on the 2 passes & measurements given, for an algorithm that alters the size of
+/// the set they operate on -- insert/delete, push/pop, enqueue/dequeue, add/remove and so on.
+///
+/// To perform the analysis, two passes are required with the same delta in elements count on each -- see [passes_info].
+/// The number of executions must be carefully chosen in order to generate elapsed times (on each pass) high enough to
+/// make OS, IO and network latencies negligible -- if the operation is CPU bounded, the machine should be idle.
+///
+/// The returned algorithm complexity -- in big-O notation -- is an indication of the time taken to execute the algorithm
+/// on one element, in proportion to a set size of 'n' elements. See [BigOAlgorithmComplexity].
 pub fn analyse_time_complexity_for_set_resizing_algorithm<ScalarTimeUnit: Copy>(passes_info:  &SetResizingAlgorithmPassesInfo,
                                                                                 measurements: &BigOTimeMeasurements<ScalarTimeUnit>) -> BigOAlgorithmComplexity {
 
@@ -86,6 +97,7 @@ mod tests {
 
     use serial_test::serial;
 
+    /// test the time complexity analysis results based on some known-to-be-correct measurement times
     #[test]
     #[serial(cpu)]
     fn analyse_constant_set_algorithm_theoretical_test() {
@@ -139,6 +151,7 @@ mod tests {
 
     }
 
+    /// test the time complexity analysis results based on some known-to-be-correct measurement times
     #[test]
     #[serial(cpu)]
     fn analyse_set_resizing_algorithm_theoretical_test() {
@@ -191,6 +204,7 @@ mod tests {
         });
     }
 
+    /// test the time complexity analysis results progression when measurements increase
     #[test]
     #[serial(cpu)]
     fn smooth_transitions() {
