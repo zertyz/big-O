@@ -14,15 +14,18 @@ use std::time::{SystemTime, Duration};
 use std::io::{self, Write};
 use std::{error::Error, fmt};
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
+use std::collections::{HashMap, BTreeMap};
 
 
-fn test_crud_algorithms<'a,
+/// calls [reset_fn] before trying again
+pub fn test_crud_algorithms<'a,
     _ResetClosure:  Fn(u32) -> u32 + Sync,
     _CreateClosure: Fn(u32) -> u32 + Sync,
     _ReadClosure:   Fn(u32) -> u32 + Sync,
     _UpdateClosure: Fn(u32) -> u32 + Sync,
     _DeleteClosure: Fn(u32) -> u32 + Sync,
-    T: TryInto<u64> > (crud_name: &'a str,
+    T: TryInto<u64> > (crud_name: &'a str, max_retry_attempts: u32,
                        reset_fn:  _ResetClosure,
                        create_fn: _CreateClosure, expected_create_time_complexity: BigOAlgorithmComplexity, expected_create_space_complexity: BigOAlgorithmComplexity,
                        read_fn:   _ReadClosure,     expected_read_time_complexity: BigOAlgorithmComplexity,   expected_read_space_complexity: BigOAlgorithmComplexity,
@@ -31,15 +34,65 @@ fn test_crud_algorithms<'a,
                        warmup_percentage: u32, create_iterations_per_pass: u32, read_iterations_per_pass: u32, update_iterations_per_pass: u32, delete_iterations_per_pass: u32,
                        create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32,
                        time_unit: &'a TimeUnit<T>) where PassResult<'a, T>: Copy, T: Copy {                            // full report
-    // delegates the responsibility -- calling the internal function with the worst possible expected complexities will cause it never to fail
-    internal_analyze_crud_algorithms(crud_name, reset_fn,
-                                     create_fn,  BigOAlgorithmComplexity::WorseThanON, BigOAlgorithmComplexity::WorseThanON,
-                                     read_fn,     BigOAlgorithmComplexity::WorseThanON,  BigOAlgorithmComplexity::WorseThanON,
-                                     update_fn, BigOAlgorithmComplexity::WorseThanON,BigOAlgorithmComplexity::WorseThanON,
-                                     delete_fn, BigOAlgorithmComplexity::WorseThanON,BigOAlgorithmComplexity::WorseThanON,
-                                     warmup_percentage, create_iterations_per_pass, read_iterations_per_pass, update_iterations_per_pass, delete_iterations_per_pass,
-                                     create_threads, read_threads, update_threads, delete_threads,
-                                     time_unit);
+
+    let mut collected_errors = Vec::<CRUDComplexityAnalysisError>::with_capacity(max_retry_attempts as usize);
+
+    // in order to reduce false-negatives, retry up to 'max_retry_attempts' if time complexity don't match
+    // the maximum acceptable create, read, update or delete 'expected_*_time_complexity'(ies)
+    for attempt in 0..max_retry_attempts {
+        let crud_analysis = internal_analyze_crud_algorithms(crud_name, &reset_fn,
+                                                             &create_fn,  expected_create_time_complexity, expected_create_space_complexity,
+                                                             &read_fn,     expected_read_time_complexity, expected_read_space_complexity,
+                                                             &update_fn, expected_update_time_complexity, expected_update_space_complexity,
+                                                             &delete_fn, expected_delete_time_complexity, expected_delete_space_complexity,
+                                                             warmup_percentage, create_iterations_per_pass, read_iterations_per_pass, update_iterations_per_pass, delete_iterations_per_pass,
+                                                             create_threads, read_threads, update_threads, delete_threads,
+                                                             time_unit);
+
+        // In case of error, retry only if the complexity analysis failed to match the maximum requirement for Time,
+        // which can be affected by run-time environment conditions (specially if the involved machines aren't fully idle
+        // or on low RAM conditions, causing swap or page faults to kick in).
+        // Space complexity analysis is always deterministic, regardless of the environment conditions.
+        if crud_analysis.is_err() {
+            let crud_analysis_error = crud_analysis.err().unwrap();
+            if crud_analysis_error.failed_analysis == "Time" {
+                if attempt < max_retry_attempts-1 {
+                    collected_errors.push(crud_analysis_error);
+                    OUTPUT(&format!("\nAttempt {} failed. Resetting before retrying", attempt));
+                    reset_fn(100);  // 100% of the created elements
+                    OUTPUT("...\n");
+                    continue;
+                } else {
+                    let unique_failed_operations_count = collected_errors.iter()
+                        .rfold(BTreeMap::<String, u32>::new(), |mut acc, collected_error| {
+                            let key = format!("{} with {:?}", collected_error.failed_operation, collected_error.failed_complexity);
+                            let op_count = acc.get_mut(&key);
+                            match op_count {
+                                Some(count) => *count += 1,
+                                None => {
+                                    acc.insert(key, 1);
+                                },
+                            };
+                            acc
+                        });
+                    let previous_errors = unique_failed_operations_count.iter()
+                        .rfold(String::new(), |mut acc, failed_operation_count_item| {
+                            let operation = failed_operation_count_item.0;
+                            let count = failed_operation_count_item.1;
+                            acc.push_str(&format!(" - {} ({} time{})\n", operation, count, if *count == 1 {""} else {"s"}));
+                            acc
+                        });
+                    panic!("After {} attempts, gave up retrying: {}.\n\
+                            Previous attempts failed at:\n\
+                            {}", max_retry_attempts, crud_analysis_error, previous_errors);
+                }
+            } else {
+                // mismatched space complexity (if not on the first loop, reset_fn probably didn't deallocated)
+                panic!("At attempt #{}, SPACE complexity mismatch: {}\n", attempt+1, crud_analysis_error);
+            }
+        }
+        break;
+    }
 }
 
 /// Runs time & space analysis for Create, Read, Update and Delete algorithms -- usually from a container or database.
@@ -106,8 +159,9 @@ pub fn analyze_crud_algorithms<'a,
 
 #[derive(Debug)]
 struct CRUDComplexityAnalysisError {
-    pub filed_operation:      String,
+    pub failed_operation:     String,
     pub failed_analysis:      String,
+    pub failed_complexity:    BigOAlgorithmComplexity,
     pub failed_assertion_msg: String,
     pub partial_report:       String,
 }
@@ -119,7 +173,7 @@ impl Display for CRUDComplexityAnalysisError {
 impl Error for CRUDComplexityAnalysisError {}
 
 /// Returns the analyzed complexities + the full report, as a string in the form (create, read, update, delete, report).
-/// If one of the measured complexities don't match the minimum expected, None is returned for that analysis, provided it's *_number_of_iterations_per_pass is > 0.
+/// If one of the measured complexities don't match the maximum expected, None is returned for that analysis, provided it's *_number_of_iterations_per_pass is > 0.
 fn internal_analyze_crud_algorithms<'a,
                               _ResetClosure:  Fn(u32) -> u32 + Sync,
                               _CreateClosure: Fn(u32) -> u32 + Sync,
@@ -177,13 +231,13 @@ fn internal_analyze_crud_algorithms<'a,
     fn calc_regular_cru_range(iterations_per_pass: u32, pass_number: u32) -> Range<u32> { iterations_per_pass * pass_number       .. iterations_per_pass * (pass_number + 1) }
     fn calc_regular_d_range(iterations_per_pass: u32, pass_number: u32) -> Range<u32> { iterations_per_pass * (pass_number + 1) .. iterations_per_pass * pass_number }
 
-    /// Contains factored out code to measure & analyze READ or UPDATE operations, checking the expected minimum time & space complexities
+    /// Contains factored out code to measure & analyze READ or UPDATE operations, checking the expected maximum time & space complexities
     ///   - [pass_number] -- u32 in the range [0..NUMBER_OF_PASSES]: specifies the number of the pass being run
     ///   - [operation_name] -- &str: either "Read" or "Update"
     ///   - [suffix] -- &str: ", " or "" -- used to correctly separate intermediate results
     ///   - [passes_results] -- either [read_passes_results] or [update_passes_results]: the array to put [PassResults] on
     ///   - [algorithm_closure] -- the algorithm closure to run -- either [read_fn] or [update_fn]
-    ///   - [expected_time_complexity] & [expected_space_complexity] -- the minimum expected complexities (cause the method
+    ///   - [expected_time_complexity] & [expected_space_complexity] -- the maximum expected complexities (cause the method
     ///     to return in error if the expectations are not met)
     ///   - [number_of_iterations_per_pass] -- u32: either [read_iterations_per_pass] or [update_iterations_per_pass]
     ///   - [number_of_threads] -- u32: either [read_threads] or [update_threads]
@@ -227,7 +281,7 @@ fn internal_analyze_crud_algorithms<'a,
         }
     }
 
-    /// Contains factored out code to measure & analyze CREATE or DELETE operations, checking the expected minimum time & space complexities
+    /// Contains factored out code to measure & analyze CREATE or DELETE operations, checking the expected maximum time & space complexities
     ///   - [pass_number] -- u32 in the range [0..NUMBER_OF_PASSES]: specifies the number of the pass being run
     ///   - [operation_name] -- &str: either "Read" or "Update"
     ///   - [suffix] -- &str: ", " or "" -- used to correctly separate intermediate results
@@ -235,7 +289,7 @@ fn internal_analyze_crud_algorithms<'a,
     ///     the intermediate measurements -- should return "operation_name: " for create; "2nd", "1st; " for delete;
     ///   - [passes_results] -- either [create_passes_results] or [delete_passes_results]: the array to put [PassResults] on
     ///   - [algorithm_closure] -- the algorithm closure to run -- either [create_fn] or [delete_fn]
-    ///   - [expected_time_complexity] & [expected_space_complexity] -- the minimum expected complexities (cause the method
+    ///   - [expected_time_complexity] & [expected_space_complexity] -- the maximum expected complexities (cause the method
     ///     to return in error if the expectations are not met)
     ///   - [number_of_iterations_per_pass] -- u32: either [create_iterations_per_pass] or [delete_iterations_per_pass]
     ///   - [number_of_threads] -- u32: either [create_threads] or [delete_threads]
@@ -285,19 +339,21 @@ fn internal_analyze_crud_algorithms<'a,
          $expected_time_complexity: ident, $expected_space_complexity: ident,
          $observed_time_complexity: ident, $observed_space_complexity: ident) => {
             if $observed_time_complexity as u32 > $expected_time_complexity as u32 {
-                _output(&format!(" ** Aborted due to TIME complexity mismatch on '{}' operation: minimum: {:?}, measured: {:?}\n\n", $operation_name, $expected_time_complexity, $observed_time_complexity));
+                _output(&format!(" ** Aborted due to TIME complexity mismatch on '{}' operation: maximum: {:?}, measured: {:?}\n\n", $operation_name, $expected_time_complexity, $observed_time_complexity));
                 return Err(CRUDComplexityAnalysisError {
-                    filed_operation:      $operation_name.to_string(),
+                    failed_operation:     $operation_name.to_string(),
                     failed_analysis:      "Time".to_owned(),
-                    failed_assertion_msg: format!("'{}' algorithm was expected to match a minimum TIME complexity of '{:?}', but '{:?}' was measured", $operation_name, $expected_time_complexity, $observed_time_complexity),
+                    failed_complexity:    $observed_time_complexity,
+                    failed_assertion_msg: format!("'{}' algorithm was expected to match a maximum TIME complexity of '{:?}', but '{:?}' was measured", $operation_name, $expected_time_complexity, $observed_time_complexity),
                     partial_report:       full_report,
                 });
             } else if $observed_space_complexity as u32 > $expected_space_complexity as u32 {
-                _output(&format!(" ** Aborted due to SPACE complexity mismatch on '{}' operation: minimum: {:?}, measured: {:?}\n\n", $operation_name, $expected_space_complexity, $observed_space_complexity));
+                _output(&format!(" ** Aborted due to SPACE complexity mismatch on '{}' operation: maximum: {:?}, measured: {:?}\n\n", $operation_name, $expected_space_complexity, $observed_space_complexity));
                 return Err(CRUDComplexityAnalysisError {
-                    filed_operation:      $operation_name.to_string(),
+                    failed_operation:     $operation_name.to_string(),
                     failed_analysis:      "Space".to_owned(),
-                    failed_assertion_msg: format!("'{}' algorithm was expected to match a minimum SPACE complexity of '{:?}', but '{:?}' was measured", $operation_name, $expected_space_complexity, $observed_space_complexity),
+                    failed_complexity:    $observed_space_complexity,
+                    failed_assertion_msg: format!("'{}' algorithm was expected to match a maximum SPACE complexity of '{:?}', but '{:?}' was measured", $operation_name, $expected_space_complexity, $observed_space_complexity),
                     partial_report:       full_report,
                 });
             } else {
@@ -590,38 +646,34 @@ mod tests {
         let iterations_per_pass: u32 = 400_000*conditionals::LOOP_MULTIPLIER;
         let n_threads = 1;
         let vec_locker = parking_lot::RwLock::new(Vec::<u32>::with_capacity(0));
-        let crud_analysis = analyze_crud_algorithms("Push & Pop (best case) Vec with ParkingLot",
+        test_crud_algorithms("Push & Pop (best case) Vec with ParkingLot", 5,
                 |_n| {
                     let mut vec = vec_locker.write();
                     vec.clear();
+                    vec.shrink_to_fit();
                     vec.len() as u32
                 },
                 |n| {
                     let mut vec = vec_locker.write();
                     vec.push(n);
                     vec.len() as u32
-                },
+                }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
                 |n| {
                     let vec = vec_locker.read();
                     vec[n as usize]
-                },
+                }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
                 |n| {
                     let mut vec = vec_locker.write();
                     vec[n as usize] = n+1;
                     vec.len() as u32
-                },
+                }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
                 |_n| {
                     let mut vec = vec_locker.write();
                     vec.pop().unwrap()
-                },
+                }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
                 25, iterations_per_pass, iterations_per_pass, iterations_per_pass, iterations_per_pass,
                 n_threads, n_threads, n_threads, n_threads,
                 &TimeUnits::MICROSECOND);
-        let (create_analysis, read_analysis, update_analysis, delete_analysis, _full_report) = crud_analysis;
-        assert_complexity!(create_analysis.unwrap().time_complexity, BigOAlgorithmComplexity::O1, "CREATE complexity mismatch");
-        assert_complexity!(  read_analysis.unwrap().time_complexity, BigOAlgorithmComplexity::O1,   "READ complexity mismatch");
-        assert_complexity!(update_analysis.unwrap().time_complexity, BigOAlgorithmComplexity::O1, "UPDATE complexity mismatch");
-        assert_complexity!(delete_analysis.unwrap().time_complexity, BigOAlgorithmComplexity::O1, "DELETE complexity mismatch");
     }
 
     /// Attests the worst case CRUD for vectors:
@@ -631,15 +683,14 @@ mod tests {
     #[test]
     #[serial(cpu)]
     fn vec_worst_case_algorithm_analysis() {
-let mem_save_point = ALLOC.save_point();
         let iterations_per_pass: u32 = 25_000/* *conditionals::LOOP_MULTIPLIER*/;
         let n_threads = 1;
         let vec_locker = parking_lot::RwLock::new(Vec::<u32>::with_capacity(0));
-        let crud_analysis = analyze_crud_algorithms("Insert & Remove (worst case) Vec with ParkingLot",
+        test_crud_algorithms("Insert & Remove (worst case) Vec with ParkingLot", 5,
                |_n| {
                    let mut vec = vec_locker.write();
                    vec.clear();
-                   //hashmap.shrink_to_fit();
+                   vec.shrink_to_fit();     // needed for retries (even if warmup is disabled)
                    vec.len() as u32
                },
                |n| {
@@ -647,29 +698,23 @@ let mem_save_point = ALLOC.save_point();
                    let mut vec = vec_locker.write();
                    vec.insert(0, val);
                    val
-               },
+               }, BigOAlgorithmComplexity::ON, BigOAlgorithmComplexity::O1,
                |n| {
                    let vec = vec_locker.read();
                    vec[(n % iterations_per_pass) as usize]
-               },
+               }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
                |n| {
                    let mut vec = vec_locker.write();
                    vec[(n % iterations_per_pass) as usize] = n;
                    vec.len() as u32
-               },
+               }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
                |_n| {
                    let mut vec = vec_locker.write();
                    vec.remove(0)
-               },
+               }, BigOAlgorithmComplexity::ON, BigOAlgorithmComplexity::O1,
                0, iterations_per_pass, iterations_per_pass*10, iterations_per_pass*10, iterations_per_pass,
                n_threads, n_threads, n_threads, n_threads,
                &TimeUnits::MICROSECOND);
-        let (create_analysis, read_analysis, update_analysis, delete_analysis, _full_report) = crud_analysis;
-        assert_complexity!(create_analysis.unwrap().time_complexity, BigOAlgorithmComplexity::ON, "CREATE complexity mismatch");
-        assert_complexity!(  read_analysis.unwrap().time_complexity, BigOAlgorithmComplexity::O1,   "READ complexity mismatch");
-        assert_complexity!(update_analysis.unwrap().time_complexity, BigOAlgorithmComplexity::O1, "UPDATE complexity mismatch");
-        assert_complexity!(delete_analysis.unwrap().time_complexity, BigOAlgorithmComplexity::ON, "DELETE complexity mismatch");
-
     }
 
     /// Attests O(1) performance characteristics for HashMaps
@@ -679,11 +724,11 @@ let mem_save_point = ALLOC.save_point();
         let iterations_per_pass = 40_000*conditionals::LOOP_MULTIPLIER;
         let n_threads = 1;
         let map_locker = Arc::new(parking_lot::RwLock::new(HashMap::<String, u32>::with_capacity(2 * iterations_per_pass as usize)));
-        let crud_analysis = analyze_crud_algorithms("Hashmap<String, u32> with ParkingLot",
+        test_crud_algorithms("Pre-allocated Hashmap<String, u32> with ParkingLot", 5,
                |_n| {
                    let mut hashmap = map_locker.write();
                    hashmap.clear();
-                   //hashmap.shrink_to_fit();
+                   //hashmap.shrink_to_fit();   we're using a pre-allocated hash map
                    hashmap.len() as u32
                },
                |n| {
@@ -691,30 +736,25 @@ let mem_save_point = ALLOC.save_point();
                    let mut hashmap = map_locker.write();
                    hashmap.insert(key, n);
                    hashmap.len() as u32
-               },
+               }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
                |n| {
                    let key = format!("key for {}", n);
                    let hashmap = map_locker.read();
                    hashmap[&key]
-               },
+               }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
                |n| {
                    let key = format!("key for {}", n);
                    let mut hashmap = map_locker.write();
                    hashmap.insert(key, n+1);
                    hashmap.len() as u32
-               },
+               }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
                |n| {
                    let key = format!("key for {}", n);
                    let mut hashmap = map_locker.write();
                    hashmap.remove(&key).unwrap_or_default()
-               },
+               }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
                20, iterations_per_pass, iterations_per_pass, iterations_per_pass, iterations_per_pass,
                n_threads, n_threads, n_threads, n_threads,
                &TimeUnits::MICROSECOND);
-        let (create_analysis, read_analysis, update_analysis, delete_analysis, _full_report) = crud_analysis;
-        assert_complexity!(create_analysis.unwrap().time_complexity, BigOAlgorithmComplexity::O1, "CREATE complexity mismatch");
-        assert_complexity!(  read_analysis.unwrap().time_complexity, BigOAlgorithmComplexity::O1,   "READ complexity mismatch");
-        assert_complexity!(update_analysis.unwrap().time_complexity, BigOAlgorithmComplexity::O1, "UPDATE complexity mismatch");
-        assert_complexity!(delete_analysis.unwrap().time_complexity, BigOAlgorithmComplexity::O1, "DELETE complexity mismatch");
     }
 }
