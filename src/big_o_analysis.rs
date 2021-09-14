@@ -247,7 +247,7 @@ mod tests {
             r ^ (len as u32 + vec.iter().sum::<u32>())
         }
 
-        let assert = |measurement_name, select_function: fn(u32) -> u32, expected_complexity| {
+        let analyze = |measurement_name, select_function: fn(u32) -> u32, expected_complexity| {
             OUTPUT(&format!("Real '{}' adding {} elements on each pass ", measurement_name, REPETITIONS));
 
             let (_warmup_result, r1) = _run_pass("(warmup: ", "",    select_function, &BigOAlgorithmType::ConstantSet, 0 .. REPETITIONS / 10,                            TIME_UNIT);
@@ -285,14 +285,25 @@ mod tests {
             };
 
             OUTPUT(&format!("\n{} (r={})\n", algorithm_analysis, r1+r2+r3));
-            assert_eq!(algorithm_analysis.space_complexity, expected_complexity, "Algorithm SPACE Analysis on CONSTANT SET algorithm for '{}' check failed!", measurement_name);
-            assert_eq!(algorithm_analysis.time_complexity,  expected_complexity, "Algorithm TIME  Analysis on CONSTANT SET algorithm for '{}' check failed!", measurement_name);
-
+            algorithm_analysis
         };
 
-        assert("O1_select() function",    o_1_select,     BigOAlgorithmComplexity::O1);
-        assert("OLogN_select() function", o_log_n_select, BigOAlgorithmComplexity::OLogN);
-        assert("ON_select() function",    o_n_select,     BigOAlgorithmComplexity::ON);
+        let assert_with_retry = |max_retries, measurement_name, insert_function: fn(u32) -> u32, expected_complexity| {
+            for attempt in 1..max_retries+1 {
+                let algorithm_analysis = analyze(measurement_name, insert_function, expected_complexity);
+                assert_eq!(algorithm_analysis.space_complexity, expected_complexity, "Algorithm SPACE Analysis on CONSTANT SET algorithm for '{}' check failed!", measurement_name);
+                if algorithm_analysis.time_complexity != expected_complexity && attempt < max_retries {
+                    OUTPUT("\n==> Time measurement mismatch. Retrying...\n\n");
+                    continue;
+                }
+                assert_eq!(algorithm_analysis.time_complexity,  expected_complexity, "Algorithm TIME  Analysis on CONSTANT SET algorithm for '{}' check failed!", measurement_name);
+                break;
+            }
+        };
+
+        assert_with_retry(15, "O1_select() function",    o_1_select,     BigOAlgorithmComplexity::O1);
+        assert_with_retry(15, "OLogN_select() function", o_log_n_select, BigOAlgorithmComplexity::OLogN);
+        assert_with_retry(15, "ON_select() function",    o_n_select,     BigOAlgorithmComplexity::ON);
 
     }
 
@@ -333,7 +344,7 @@ mod tests {
             r ^ (len as u32 + vec.iter().sum::<u32>())
         }
 
-        let assert = |measurement_name, insert_function: fn(u32) -> u32, expected_complexity| {
+        let analyze = |measurement_name, insert_function: fn(u32) -> u32, expected_complexity| {
             OUTPUT(&format!("Real '{}' with {} elements on each pass ", measurement_name, DELTA_SET_SIZE));
 
             /* warmup pass -- container / database should be reset before and after this */
@@ -369,13 +380,25 @@ mod tests {
             };
             
             OUTPUT(&format!("\n{} (r={})\n", algorithm_analysis, r1^r2^r3));
-            assert_eq!(algorithm_analysis.space_complexity, expected_complexity, "Algorithm SPACE Analysis on SET RESIZING algorithm for '{}' check failed!", measurement_name);
-            assert_eq!(algorithm_analysis.time_complexity,  expected_complexity, "Algorithm TIME  Analysis on SET RESIZING algorithm for '{}' check failed!", measurement_name);
+            algorithm_analysis
         };
 
-        assert("O1_insert() function",    o_1_insert,     BigOAlgorithmComplexity::O1);
-        assert("OLogN_insert() function", o_log_n_insert, BigOAlgorithmComplexity::OLogN);
-        assert("ON_insert() function",    o_n_insert,     BigOAlgorithmComplexity::ON);
+        let assert_with_retry = |max_retries, measurement_name, insert_function: fn(u32) -> u32, expected_complexity| {
+            for attempt in 1..max_retries+1 {
+                let algorithm_analysis = analyze(measurement_name, insert_function, expected_complexity);
+                assert_eq!(algorithm_analysis.space_complexity, expected_complexity, "Algorithm SPACE Analysis on SET RESIZING algorithm for '{}' check failed!", measurement_name);
+                if algorithm_analysis.time_complexity != expected_complexity && attempt < max_retries {
+                    OUTPUT("\n==> Time measurement mismatch. Retrying...\n\n");
+                    continue;
+                }
+                assert_eq!(algorithm_analysis.time_complexity,  expected_complexity, "Algorithm TIME  Analysis on SET RESIZING algorithm for '{}' check failed!", measurement_name);
+                break;
+            }
+        };
+
+        assert_with_retry(15, "O1_insert() function",    o_1_insert,     BigOAlgorithmComplexity::O1);
+        assert_with_retry(15, "OLogN_insert() function", o_log_n_insert, BigOAlgorithmComplexity::OLogN);
+        assert_with_retry(15, "ON_insert() function",    o_n_insert,     BigOAlgorithmComplexity::ON);
     }
 
    #[inline]

@@ -646,7 +646,7 @@ mod tests {
         let iterations_per_pass: u32 = 400_000*conditionals::LOOP_MULTIPLIER;
         let n_threads = 1;
         let vec_locker = parking_lot::RwLock::new(Vec::<u32>::with_capacity(0));
-        test_crud_algorithms("Vec Push & Pop (best case) with ParkingLot", 5,
+        test_crud_algorithms("Vec Push & Pop (best case) with ParkingLot", 15,
                 |_n| {
                     let mut vec = vec_locker.write();
                     vec.clear();
@@ -686,7 +686,7 @@ mod tests {
         let iterations_per_pass: u32 = 25_000/* *conditionals::LOOP_MULTIPLIER*/;
         let n_threads = 1;
         let vec_locker = parking_lot::RwLock::new(Vec::<u32>::with_capacity(0));
-        test_crud_algorithms("Vec Insert & Remove (worst case) with ParkingLot", 5,
+        test_crud_algorithms("Vec Insert & Remove (worst case) with ParkingLot", 15,
                |_n| {
                    let mut vec = vec_locker.write();
                    vec.clear();
@@ -724,7 +724,7 @@ mod tests {
         let iterations_per_pass = 40_000*conditionals::LOOP_MULTIPLIER;
         let n_threads = 1;
         let map_locker = Arc::new(parking_lot::RwLock::new(HashMap::<String, u32>::with_capacity(2 * iterations_per_pass as usize)));
-        test_crud_algorithms("Pre-allocated Hashmap<String, u32> with ParkingLot", 5,
+        test_crud_algorithms("Pre-allocated Hashmap<String, u32> with ParkingLot", 15,
                |_n| {
                    let mut hashmap = map_locker.write();
                    hashmap.clear();
