@@ -239,7 +239,7 @@ mod tests {
             }
             let mut len = 0;
             while n > 0 {
-                r += busy_loop(BUSY_LOOP_DELAY/500);
+                r += busy_loop(BUSY_LOOP_DELAY/400);
                 n -= 1;
                 len += 1;
             }
@@ -248,7 +248,7 @@ mod tests {
         }
 
         let analyze = |measurement_name, select_function: fn(u32) -> u32, expected_complexity| {
-            OUTPUT(&format!("Real '{}' adding {} elements on each pass ", measurement_name, REPETITIONS));
+            OUTPUT(&format!("Real '{}', fetching {} elements on each pass ", measurement_name, REPETITIONS));
 
             let (_warmup_result, r1) = _run_pass("(warmup: ", "",    select_function, &BigOAlgorithmType::ConstantSet, 0 .. REPETITIONS / 10,                            TIME_UNIT);
             let (pass_1_result, r2) = _run_pass("; pass1: ", "",    select_function, &BigOAlgorithmType::ConstantSet, 0 .. PASS_1_SET_SIZE,                             TIME_UNIT);

@@ -723,7 +723,10 @@ mod tests {
     fn hashmap_algorithm_analysis() {
         let iterations_per_pass = 40_000*conditionals::LOOP_MULTIPLIER;
         let n_threads = 1;
+        let allocator_save_point = ALLOC.save_point();
         let map_locker = Arc::new(parking_lot::RwLock::new(HashMap::<String, u32>::with_capacity(2 * iterations_per_pass as usize)));
+        let hashmap_allocation_statistics = ALLOC.delta_statistics(&allocator_save_point);
+        OUTPUT(&format!("Pre-allocated the HashMap with {} buckets consumed {} bytes", 2*iterations_per_pass, hashmap_allocation_statistics.allocated_bytes - hashmap_allocation_statistics.deallocated_bytes));
         test_crud_algorithms("Pre-allocated Hashmap<String, u32> with ParkingLot", 15,
                |_n| {
                    let mut hashmap = map_locker.write();
