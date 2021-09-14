@@ -721,7 +721,7 @@ mod tests {
     #[test]
     #[serial(cpu)]
     fn hashmap_algorithm_analysis() {
-        let iterations_per_pass = 40_000*conditionals::LOOP_MULTIPLIER;
+        let iterations_per_pass = 30_000*conditionals::LOOP_MULTIPLIER;
         let n_threads = 1;
         let allocator_save_point = ALLOC.save_point();
         let map_locker = Arc::new(parking_lot::RwLock::new(HashMap::<String, u32>::with_capacity(2 * iterations_per_pass as usize)));
