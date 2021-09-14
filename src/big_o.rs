@@ -58,7 +58,7 @@ pub fn test_crud_algorithms<'a,
             if crud_analysis_error.failed_analysis == "Time" {
                 if attempt < max_retry_attempts-1 {
                     collected_errors.push(crud_analysis_error);
-                    OUTPUT(&format!("\nAttempt {} failed. Resetting before retrying", attempt));
+                    OUTPUT(&format!("\nAttempt {} failed. Resetting before retrying", attempt+1));
                     reset_fn(100);  // 100% of the created elements
                     OUTPUT("...\n");
                     continue;
@@ -646,7 +646,7 @@ mod tests {
         let iterations_per_pass: u32 = 400_000*conditionals::LOOP_MULTIPLIER;
         let n_threads = 1;
         let vec_locker = parking_lot::RwLock::new(Vec::<u32>::with_capacity(0));
-        test_crud_algorithms("Push & Pop (best case) Vec with ParkingLot", 5,
+        test_crud_algorithms("Vec Push & Pop (best case) with ParkingLot", 5,
                 |_n| {
                     let mut vec = vec_locker.write();
                     vec.clear();
@@ -686,7 +686,7 @@ mod tests {
         let iterations_per_pass: u32 = 25_000/* *conditionals::LOOP_MULTIPLIER*/;
         let n_threads = 1;
         let vec_locker = parking_lot::RwLock::new(Vec::<u32>::with_capacity(0));
-        test_crud_algorithms("Insert & Remove (worst case) Vec with ParkingLot", 5,
+        test_crud_algorithms("Vec Insert & Remove (worst case) with ParkingLot", 5,
                |_n| {
                    let mut vec = vec_locker.write();
                    vec.clear();

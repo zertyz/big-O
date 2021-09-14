@@ -71,11 +71,11 @@ impl Display for MetricsAllocatorStatistics<usize> {
 }
 
 /// struct returned by [MetricsAllocator::save_point()]
-pub struct MetricsAllocatorSavePoint<'a> {
+pub struct MetricsAllocatorSavePoint<'a, const RING_BUFFER_SIZE: usize> {
     /// contains the allocation metrics since point-zero
     pub metrics:                      MetricsAllocatorStatistics<usize>,
     /// object to allow retrieving all subsequent saved points -- see the algorithm in [MetricsAllocator::save_point()] and [MetricsAllocator::delta_statistics()]
-    used_memory_ring_buffer_consumer: RingBufferConsumer<'a, SavePointRingBufferSlot<usize>>,
+    used_memory_ring_buffer_consumer: RingBufferConsumer<'a, SavePointRingBufferSlot<usize>, RING_BUFFER_SIZE>,
 
 }
 
@@ -105,12 +105,12 @@ impl Default for SavePointRingBufferSlot<AtomicUsize> {
 
 /// The replacement for the System's Global Allocator allocator.
 /// Please see this module's docs for more info and usage examples.
-pub struct MetricsAllocator<'a/*, const RING_BUFFER_SIZE: usize*/> {
+pub struct MetricsAllocator<'a, const RING_BUFFER_SIZE: usize> {
     system_allocator:        &'a System,
     statistics:              MetricsAllocatorStatistics<AtomicUsize>,
-    used_memory_ring_buffer: RingBuffer<SavePointRingBufferSlot<usize>/*, RING_BUFFER_SIZE*/>,
+    used_memory_ring_buffer: RingBuffer<SavePointRingBufferSlot<usize>, RING_BUFFER_SIZE>,
 }
-impl<'a/*, const RING_BUFFER_SIZE: usize*/> MetricsAllocator<'a/*, RING_BUFFER_SIZE*/> {
+impl<'a, const RING_BUFFER_SIZE: usize> MetricsAllocator<'a, RING_BUFFER_SIZE> {
 
     /// Please see this module's docs for more info and usage examples.
     pub const fn new() -> Self {
@@ -130,31 +130,13 @@ impl<'a/*, const RING_BUFFER_SIZE: usize*/> MetricsAllocator<'a/*, RING_BUFFER_S
                 min_used_memory:             AtomicUsize::new(0),
                 max_used_memory:             AtomicUsize::new(0),
             },
-            used_memory_ring_buffer: RingBuffer::new(
-                // Rust 1.54 still has a lot of generic features missing... so, for the time being, this is what I could do to initialize ring buffer
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-                SavePointRingBufferSlot {min_used_memory:0, max_used_memory:0},
-            ),
+            used_memory_ring_buffer: RingBuffer::new(),
         }
     }
 
     /// Prepares a new measurement for future allocations, to be inferred by [delta_statistics()].\
     /// Please see this module's docs for more info and usage examples.
-    pub fn save_point(&self) -> MetricsAllocatorSavePoint {
+    pub fn save_point(&self) -> MetricsAllocatorSavePoint<RING_BUFFER_SIZE> {
         // add the current (min,max) to the ring buffer and start a new counter.
         // the new consumer will consume any further saved_points + the current (min,max)
         self.used_memory_ring_buffer.enqueue(SavePointRingBufferSlot {
@@ -185,7 +167,7 @@ impl<'a/*, const RING_BUFFER_SIZE: usize*/> MetricsAllocator<'a/*, RING_BUFFER_S
 
     /// Returns the allocation statistics between now and the point in time which 'save_point' was generated.
     /// Please see this module's docs for more info and usage examples.
-    pub fn delta_statistics(&self, save_point: &MetricsAllocatorSavePoint) -> MetricsAllocatorStatistics<usize> {
+    pub fn delta_statistics(&self, save_point: &MetricsAllocatorSavePoint<RING_BUFFER_SIZE>) -> MetricsAllocatorStatistics<usize> {
         let mut min = usize::MAX;
         let mut max = usize::MIN;
         // compute (min,max) since the given 'save_point'
@@ -280,7 +262,7 @@ impl<'a/*, const RING_BUFFER_SIZE: usize*/> MetricsAllocator<'a/*, RING_BUFFER_S
 }
 
 /// the global allocator
-unsafe impl<'a/*, const RING_BUFFER_SIZE: usize*/> GlobalAlloc for MetricsAllocator<'a/*, RING_BUFFER_SIZE*/> {
+unsafe impl<'a, const RING_BUFFER_SIZE: usize> GlobalAlloc for MetricsAllocator<'a, RING_BUFFER_SIZE> {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         self.compute_alloc_metrics(&layout);
         self.system_allocator.alloc(layout)
@@ -321,7 +303,7 @@ mod tests {
     #[test]
     #[serial(cpu)]
     fn test_save_point_min_and_max_memory_usage() {
-        let allocator = MetricsAllocator::new();
+        let allocator = MetricsAllocator::<16>::new();
         let mut used_mem = 0usize;
         let mut min_mem = usize::MAX;
         let mut max_mem = usize::MIN;

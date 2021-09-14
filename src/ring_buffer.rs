@@ -8,62 +8,37 @@
 //! Note: the commented out code on this module is a failed attempt to make this class generic, but Rust 1.54 seems, unfortunately,
 //!       to be still incomplete regarding this area (generics & const fn's)
 use std::sync::atomic::{AtomicU32, Ordering};
-/*use std::mem::MaybeUninit;*/
+use std::mem::MaybeUninit;
 
 
-/// temporary constant in use while Rust still do not allow this module to be fully generic
-pub const RING_BUFFER_SIZE: usize = 16;
+///// temporary constant in use while Rust still do not allow this module to be fully generic
+//pub const RING_BUFFER_SIZE: usize = 16;
 
 
 /// Represents a concurrent, zero-copy, zero-cost multiple-consumers Ringer buffer.\
 /// Create a new ring buffer of [u32]s with:
 /// ```no_compile
 ///   let ring_buffer = crate::big_O::ring_buffer::RingBuffer::<u32>::new();
-pub struct RingBuffer<Slot/*, const RING_BUFFER_SIZE: usize*/> {
+pub struct RingBuffer<Slot, const RING_BUFFER_SIZE: usize> {
     /// if ahead of [published_tail], indicates a new slot is being filled in, to soon be published
     reserved_tail: AtomicU32,
     /// once the slot data is set in place, this counter increases to indicate a new element is ready to be consumed
     published_tail: AtomicU32,
-    buffer: [Slot; RING_BUFFER_SIZE],
-//    buffer: MaybeUninit<[Slot; RING_BUFFER_SIZE]>,
+    buffer: MaybeUninit<[Slot; RING_BUFFER_SIZE]>,
 }
 
-impl<Slot/*, const RING_BUFFER_SIZE: usize*/> RingBuffer<Slot/*, RING_BUFFER_SIZE*/> {
+impl<Slot, const RING_BUFFER_SIZE: usize> RingBuffer<Slot, RING_BUFFER_SIZE> {
 
-    pub const fn new(
-        // Rust 1.54 still do not allow const uninit data, nor generics implementing other trait than Sized -- unfortunately
-        default_slot1:  Slot,
-        default_slot2:  Slot,
-        default_slot3:  Slot,
-        default_slot4:  Slot,
-        default_slot5:  Slot,
-        default_slot6:  Slot,
-        default_slot7:  Slot,
-        default_slot8:  Slot,
-        default_slot9:  Slot,
-        default_slot10: Slot,
-        default_slot11: Slot,
-        default_slot12: Slot,
-        default_slot13: Slot,
-        default_slot14: Slot,
-        default_slot15: Slot,
-        default_slot16: Slot,
-    ) -> Self {
+    pub const fn new() -> Self {
         Self {
             reserved_tail: AtomicU32::new(0),
             published_tail: AtomicU32::new(0),
-            buffer: [
-                default_slot1,  default_slot2,  default_slot3,  default_slot4,
-                default_slot5,  default_slot6,  default_slot7,  default_slot8,
-                default_slot9,  default_slot10, default_slot11, default_slot12,
-                default_slot13, default_slot14, default_slot15, default_slot16
-            ],
-//            buffer: MaybeUninit::uninit(),
+            buffer: MaybeUninit::uninit(),
         }
     }
 
     /// creates a new consumer able to consume elements produced after this call
-    pub fn new_consumer(&self) -> RingBufferConsumer<'_, Slot> {
+    pub fn new_consumer(&self) -> RingBufferConsumer<'_, Slot, RING_BUFFER_SIZE> {
         RingBufferConsumer {
             head: AtomicU32::new(self.published_tail.load(Ordering::Relaxed)),
             ring_buffer: &self,
@@ -82,7 +57,8 @@ impl<Slot/*, const RING_BUFFER_SIZE: usize*/> RingBuffer<Slot/*, RING_BUFFER_SIZ
         //              to put in the new element
         let mutable_buffer = unsafe {
 //            let buffer = self.buffer.assume_init();
-            let const_ptr = &self.buffer as *const [Slot; RING_BUFFER_SIZE];
+            //let const_ptr = &self.buffer as *const [Slot; RING_BUFFER_SIZE];
+            let const_ptr = self.buffer.as_ptr();
             let mut_ptr = const_ptr as *mut [Slot; RING_BUFFER_SIZE];
             &mut *mut_ptr
         };
@@ -96,6 +72,10 @@ impl<Slot/*, const RING_BUFFER_SIZE: usize*/> RingBuffer<Slot/*, RING_BUFFER_SIZ
             }
         }
 
+    }
+
+    pub fn get_buffer_size(&self) -> usize {
+        RING_BUFFER_SIZE
     }
 
 }
@@ -118,11 +98,11 @@ impl<Slot/*, const RING_BUFFER_SIZE: usize*/> RingBuffer<Slot/*, RING_BUFFER_SIZ
 ///
 /// If these 3 steps are not enough, you might consider using a non-zero-cost multiple consumers ring-buffer, a non-zero-copy one or even a
 /// single-consumer ring-buffer. If you know of a way of solving this limitation here, please contact me.
-pub struct RingBufferConsumer<'a, Slot> {
+pub struct RingBufferConsumer<'a, Slot, const RING_BUFFER_SIZE: usize> {
     head: AtomicU32,
-    ring_buffer: &'a RingBuffer<Slot>,
+    ring_buffer: &'a RingBuffer<Slot, RING_BUFFER_SIZE>,
 }
-impl<'a, Slot> RingBufferConsumer<'a, Slot> {
+impl<'a, Slot, const RING_BUFFER_SIZE: usize> RingBufferConsumer<'a, Slot, RING_BUFFER_SIZE> {
 
     /// Zero-copy dequeueing -- returns a reference to the ring-buffer slot containing the dequeued element.
     /// Please note a silent race condition may happen if the ring-buffer's enqueueing operation keeps happening
@@ -152,7 +132,13 @@ impl<'a, Slot> RingBufferConsumer<'a, Slot> {
                 }
             }
             match self.head.compare_exchange_weak(head, head + 1, Ordering::Acquire, Ordering::Relaxed) {
-                Ok(_) => return Ok(Some(&self.ring_buffer.buffer[head as usize % RING_BUFFER_SIZE])),
+                Ok(_) => unsafe {
+                    // sorcery to get back an array from a MaybeUninit using only const stable functions (as of Rust 1.55)
+                    let const_ptr = self.ring_buffer.buffer.as_ptr();
+                    let ptr = const_ptr as *const [Slot; RING_BUFFER_SIZE];
+                    let array = &*ptr;
+                    return Ok(Some(&array[head as usize % RING_BUFFER_SIZE]))
+                },
                 Err(_reloaded_val) => continue,
             }
         }
@@ -187,9 +173,21 @@ impl<'a, Slot> RingBufferConsumer<'a, Slot> {
         } else if published_tail - head > RING_BUFFER_SIZE as u32 {
             Err(RingBufferOverflowError { msg: format!("Ring-Buffer overflow: published_tail={}, head={} -- tail could not be farther from head than the ring buffer size of {}", published_tail, head, RING_BUFFER_SIZE) })
         } else if head_index < published_tail_index {
-            Ok([&self.ring_buffer.buffer[head_index .. published_tail_index], &[]])
+            unsafe {
+                // sorcery to get back an array from a MaybeUninit using only const stable functions (as of Rust 1.55)
+                let const_ptr = self.ring_buffer.buffer.as_ptr();
+                let ptr = const_ptr as *const [Slot; RING_BUFFER_SIZE];
+                let array = &*ptr;
+                Ok([&array[head_index .. published_tail_index], &[]])
+            }
         } else {
-            Ok([&self.ring_buffer.buffer[head_index .. RING_BUFFER_SIZE], &self.ring_buffer.buffer[0 .. published_tail_index]])
+            unsafe {
+                // sorcery to get back an array from a MaybeUninit using only const stable functions (as of Rust 1.55)
+                let const_ptr = self.ring_buffer.buffer.as_ptr();
+                let ptr = const_ptr as *const [Slot; RING_BUFFER_SIZE];
+                let array = &*ptr;
+                Ok([&array[head_index..RING_BUFFER_SIZE], &array[0..published_tail_index]])
+            }
         }
     }
 
@@ -219,7 +217,7 @@ mod tests {
     #[test]
     #[serial(cpu)]
     fn simple_enqueue_dequeue_use_cases() {
-        let ring_buffer = RingBuffer::new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        let ring_buffer = RingBuffer::<i32, 16>::new();
         let consumer = ring_buffer.new_consumer();
 
         // dequeue from empty
@@ -239,7 +237,7 @@ mod tests {
         }
 
         // circle once through the ring twice, enqueueing / dequeueing a single element at a time
-        for i in 0..2*RING_BUFFER_SIZE as i32 {
+        for i in 0..2*ring_buffer.get_buffer_size() as i32 {
             ring_buffer.enqueue(i);
             match consumer.dequeue() {
                 Ok(None)                         => panic!("No element was dequeued"),
@@ -249,10 +247,10 @@ mod tests {
         }
 
         // fill in the buffer and then dequeue all elements
-        for i in 0..RING_BUFFER_SIZE as i32 {
+        for i in 0..ring_buffer.get_buffer_size() as i32 {
             ring_buffer.enqueue(i);
         }
-        for i in 0..RING_BUFFER_SIZE as i32 {
+        for i in 0..ring_buffer.get_buffer_size() as i32 {
             match consumer.dequeue() {
                 Ok(None)                         => panic!("No element was dequeued"),
                 Ok(Some(existing_element)) => assert_eq!(existing_element, &i, "Wrong element dequeued"),
@@ -271,7 +269,7 @@ mod tests {
     #[test]
     #[serial(cpu)]
     fn peek() -> Result<(), RingBufferOverflowError> {
-        let ring_buffer = RingBuffer::new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        let ring_buffer = RingBuffer::<u32, 16>::new();
         let consumer = ring_buffer.new_consumer();
 
         let check_name = "empty peek";
@@ -289,16 +287,16 @@ mod tests {
         assert_eq!(consumer.peek_all()?.concat(), expected_elements, "{} failed", check_name);
 
         let check_name = "peek the whole ring-buffer";
-        for e in 3..1+RING_BUFFER_SIZE as u32 {
+        for e in 3..1+ring_buffer.get_buffer_size() as u32 {
             ring_buffer.enqueue(e);
         }
-        let expected_elements: Vec<u32> = (1..1+RING_BUFFER_SIZE as u32).into_iter().collect();
+        let expected_elements: Vec<u32> = (1..1+ring_buffer.get_buffer_size() as u32).into_iter().collect();
         assert_eq!(consumer.peek_all()?.concat(), expected_elements, "{} failed", check_name);
 
         let check_name = "ring goes round";
         let expected_elements = &[16,17];
         // consume all but the last, leaving only '16' there
-        for _ in 1..RING_BUFFER_SIZE as u32 {
+        for _ in 1..ring_buffer.get_buffer_size() as u32 {
             consumer.dequeue().unwrap();
         }
         ring_buffer.enqueue(17);
@@ -321,11 +319,11 @@ mod tests {
     #[test]
     #[serial(cpu)]
     fn buffer_overflowing() {
-        let ring_buffer = RingBuffer::new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        let ring_buffer = RingBuffer::<i32, 16>::new();
         let consumer = ring_buffer.new_consumer();
 
         // enqueue -- it is impossible to detect buffer overflow since we don't track consumers
-        for i in 0..1+RING_BUFFER_SIZE as i32 {
+        for i in 0..1+ring_buffer.get_buffer_size() as i32 {
             ring_buffer.enqueue(i);
         }
 
@@ -355,7 +353,7 @@ mod tests {
     #[serial(cpu)]
     fn concurrency() {
 
-        let ring_buffer = RingBuffer::new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        let ring_buffer = RingBuffer::<u32, 1024>::new();
         let consumer = ring_buffer.new_consumer();
 
         // all-in / all-out test -- enqueues everybody and then dequeues everybody
@@ -387,7 +385,7 @@ mod tests {
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         let start = 0;
         let finish = 4096;
-        let threads = 2;    // might as well be num_cpus::get();
+        let threads = 4;    // might as well be num_cpus::get();
 
         let expected_sum = (start + (finish-1)) * ( (finish - start) / 2 );
         let expected_callback_calls = finish - start;
