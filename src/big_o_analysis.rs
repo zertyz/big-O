@@ -10,12 +10,9 @@ pub mod time_analysis;
 pub mod space_analysis;
 
 use crate::{
-    conditionals::{self,OUTPUT},
+    conditionals::{self},
     big_o_analysis::{
-        self,
-        types::{BigOAlgorithmAnalysis, TimeUnit, TimeUnits, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
-                BigOTimeMeasurements, BigOSpaceMeasurements, BigOSpacePassMeasurements, BigOTimePassMeasurements,
-                SetResizingAlgorithmPassesInfo, ConstantSetAlgorithmPassesInfo},
+        types::{TimeUnit, TimeUnits, BigOTimePassMeasurements, BigOSpacePassMeasurements},
     }
 };
 
@@ -239,7 +236,7 @@ mod tests {
             }
             let mut len = 0;
             while n > 0 {
-                r += busy_loop(BUSY_LOOP_DELAY/400);
+                r += busy_loop(BUSY_LOOP_DELAY/200);
                 n -= 1;
                 len += 1;
             }
@@ -247,10 +244,10 @@ mod tests {
             r ^ (len as u32 + vec.iter().sum::<u32>())
         }
 
-        let analyze = |measurement_name, select_function: fn(u32) -> u32, expected_complexity| {
+        let analyze = |measurement_name, select_function: fn(u32) -> u32| {
             OUTPUT(&format!("Real '{}', fetching {} elements on each pass ", measurement_name, REPETITIONS));
 
-            let (_warmup_result, r1) = _run_pass("(warmup: ", "",    select_function, &BigOAlgorithmType::ConstantSet, 0 .. REPETITIONS / 10,                            TIME_UNIT);
+            let (_warmup_result               , r1) = _run_pass("(warmup: ", "",    select_function, &BigOAlgorithmType::ConstantSet, 0 .. REPETITIONS / 10,                            TIME_UNIT);
             let (pass_1_result, r2) = _run_pass("; pass1: ", "",    select_function, &BigOAlgorithmType::ConstantSet, 0 .. PASS_1_SET_SIZE,                             TIME_UNIT);
             let (pass_2_result, r3) = _run_pass("; pass2: ", "): ", select_function, &BigOAlgorithmType::ConstantSet, PASS_2_SET_SIZE - REPETITIONS .. PASS_2_SET_SIZE, TIME_UNIT);
 
@@ -290,7 +287,7 @@ mod tests {
 
         let assert_with_retry = |max_retries, measurement_name, insert_function: fn(u32) -> u32, expected_complexity| {
             for attempt in 1..max_retries+1 {
-                let algorithm_analysis = analyze(measurement_name, insert_function, expected_complexity);
+                let algorithm_analysis = analyze(measurement_name, insert_function);
                 assert_eq!(algorithm_analysis.space_complexity, expected_complexity, "Algorithm SPACE Analysis on CONSTANT SET algorithm for '{}' check failed!", measurement_name);
                 if algorithm_analysis.time_complexity != expected_complexity && attempt < max_retries {
                     OUTPUT("\n==> Time measurement mismatch. Retrying...\n\n");
@@ -344,7 +341,7 @@ mod tests {
             r ^ (len as u32 + vec.iter().sum::<u32>())
         }
 
-        let analyze = |measurement_name, insert_function: fn(u32) -> u32, expected_complexity| {
+        let analyze = |measurement_name, insert_function: fn(u32) -> u32| {
             OUTPUT(&format!("Real '{}' with {} elements on each pass ", measurement_name, DELTA_SET_SIZE));
 
             /* warmup pass -- container / database should be reset before and after this */
@@ -385,7 +382,7 @@ mod tests {
 
         let assert_with_retry = |max_retries, measurement_name, insert_function: fn(u32) -> u32, expected_complexity| {
             for attempt in 1..max_retries+1 {
-                let algorithm_analysis = analyze(measurement_name, insert_function, expected_complexity);
+                let algorithm_analysis = analyze(measurement_name, insert_function);
                 assert_eq!(algorithm_analysis.space_complexity, expected_complexity, "Algorithm SPACE Analysis on SET RESIZING algorithm for '{}' check failed!", measurement_name);
                 if algorithm_analysis.time_complexity != expected_complexity && attempt < max_retries {
                     OUTPUT("\n==> Time measurement mismatch. Retrying...\n\n");

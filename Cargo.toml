@@ -2,8 +2,8 @@
 # RUSTFLAGS="-C target-cpu=native" cargo build --release
 
 [package]
-name = "big-O"
-version = "0.1.0"
+name = "big-o"
+version = "0.2.0"
 edition = "2018"
 authors = ["zertyz"]
 

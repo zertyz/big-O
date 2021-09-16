@@ -1,21 +1,20 @@
 use crate::{
-    conditionals::{self,OUTPUT},
+    conditionals::{OUTPUT},
     big_o_analysis::{
         self, run_pass, PassResult, BigOAlgorithmType,
-        types::{BigOAlgorithmAnalysis, TimeUnit, TimeUnits, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
-                BigOTimeMeasurements, BigOSpaceMeasurements, BigOSpacePassMeasurements, BigOTimePassMeasurements,
+        types::{BigOAlgorithmAnalysis, TimeUnit, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
+                BigOTimeMeasurements, BigOSpaceMeasurements,
                 SetResizingAlgorithmPassesInfo, ConstantSetAlgorithmPassesInfo, BigOAlgorithmComplexity},
     }
 };
 
 use std::convert::TryInto;
 use std::ops::Range;
-use std::time::{SystemTime, Duration};
+use std::time::{SystemTime};
 use std::io::{self, Write};
 use std::{error::Error, fmt};
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::BTreeMap;
 
 
 /// calls [reset_fn] before trying again
@@ -197,7 +196,7 @@ fn internal_analyze_crud_algorithms<'a,
 
     let mut full_report = String::new();
 
-    /// wrap around the original 'OUTPUT' function to capture the [full_report]
+    // wrap around the original 'OUTPUT' function to capture the [full_report]
     let mut _output = |msg: &str| {
         full_report.push_str(msg);
         OUTPUT(msg);
@@ -223,8 +222,8 @@ fn internal_analyze_crud_algorithms<'a,
 
     const NUMBER_OF_PASSES: u32 = 2;
 
-    /// accumulation of computed results from [create_fn], [read_fn], [update_fn] and [delete_fn]
-    /// to avoid any call cancellation optimizations when running in release mode
+    // accumulation of computed results from [create_fn], [read_fn], [update_fn] and [delete_fn]
+    // to avoid any call cancellation optimizations when running in release mode
     let mut r: u32 = 0;
 
     // range calculation
@@ -368,7 +367,7 @@ fn internal_analyze_crud_algorithms<'a,
 
     macro_rules! run_create_pass {
         ($pass_number: expr) => {
-            run_set_resizing_pass!($pass_number, "Create", ", ", |pass_number: u32, pass_name: &str| format!("{}: ", pass_name.to_ascii_lowercase()),
+            run_set_resizing_pass!($pass_number, "Create", ", ", |_pass_number: u32, pass_name: &str| format!("{}: ", pass_name.to_ascii_lowercase()),
                                    create_passes_results, calc_regular_cru_range, NUMBER_OF_PASSES-1,
                                    create_fn, expected_create_time_complexity, expected_create_space_complexity,
                                    create_iterations_per_pass, create_threads)
@@ -387,7 +386,7 @@ fn internal_analyze_crud_algorithms<'a,
     macro_rules! run_delete_pass {
         ($pass_number: expr) => {
             run_set_resizing_pass!($pass_number, "Delete", "",
-                                   |pass_number: u32, pass_name: &str|
+                                   |pass_number: u32, _pass_name: &str|
                                        if pass_number == NUMBER_OF_PASSES-1 {
                                          "2nd: "
                                        } else {
@@ -510,12 +509,14 @@ macro_rules! assert_complexity {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate:: {
+        conditionals::{self, ALLOC},
+        big_o_analysis::types::{TimeUnits, BigOAlgorithmMeasurements, BigOAlgorithmComplexity},
+    };
 
     use serial_test::serial;
     use std::sync::Arc;
     use std::collections::HashMap;
-    use crate::big_o_analysis::types::{BigOAlgorithmMeasurements, BigOAlgorithmComplexity};
-    use crate::conditionals::ALLOC;
     use std::sync::atomic::{Ordering, AtomicU32};
 
     /// Attests that the right report structures are produced for all possible CRUD tests:

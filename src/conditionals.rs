@@ -2,7 +2,7 @@
 //!   - "features" definitions, client project's Cargo "[dependencies]" declarations
 //!   - Release / Debug compilations
 
-#![warn(dead_code)]
+#![allow(dead_code)]
 
 use std::io::{stdout,stderr,Write};
 use crate::metrics_allocator::MetricsAllocator;
