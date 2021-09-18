@@ -12,7 +12,7 @@ use crate::metrics_allocator::MetricsAllocator;
 pub const LOOP_MULTIPLIER: u32 = 1;
 #[cfg(not(debug_assertions))]
 /// loop multiplier for release compilation
-pub const LOOP_MULTIPLIER: u32 = 100;
+pub const LOOP_MULTIPLIER: u32 = 64;
 
 // if features = stdout
 pub const OUTPUT: fn(&str) = stdout_write;
