@@ -649,7 +649,7 @@ mod tests {
     #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn vec_best_case_algorithm_analysis() {
-        let iterations_per_pass: u32 = 400_000*conditionals::LOOP_MULTIPLIER;
+        let iterations_per_pass: u32 = 250_000*conditionals::LOOP_MULTIPLIER;
         let n_threads = 1;
         let vec_locker = parking_lot::RwLock::new(Vec::<u32>::with_capacity(0));
         test_crud_algorithms("Vec Push & Pop (best case) with ParkingLot", 15,
@@ -689,7 +689,7 @@ mod tests {
     #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn vec_worst_case_algorithm_analysis() {
-        let iterations_per_pass: u32 = 25_000/* *conditionals::LOOP_MULTIPLIER*/;
+        let iterations_per_pass: u32 = 20_480/* *conditionals::LOOP_MULTIPLIER*/;
         let n_threads = 1;
         let vec_locker = parking_lot::RwLock::new(Vec::<u32>::with_capacity(0));
         test_crud_algorithms("Vec Insert & Remove (worst case) with ParkingLot", 15,

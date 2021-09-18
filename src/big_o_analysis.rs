@@ -201,7 +201,7 @@ mod tests {
     #[serial(cpu)]
     fn analyse_constant_set_algorithm_real_test() {
 
-        const REPETITIONS: u32 = 4000;
+        const REPETITIONS: u32 = 3072;
         const PASS_1_SET_SIZE: u32 = REPETITIONS;
         const PASS_2_SET_SIZE: u32 = REPETITIONS * 3;
         const TIME_UNIT: &TimeUnit<u128> = &TimeUnits::MICROSECOND;
@@ -311,7 +311,7 @@ mod tests {
     #[serial(cpu)]
     fn analyse_set_resizing_algorithm_real_test() {
 
-        const DELTA_SET_SIZE: u32 = 3000;
+        const DELTA_SET_SIZE: u32 = 3072;
 
         fn o_1_insert(mut _n: u32) -> u32 {
             // single element allocation & busy_loop time processing
