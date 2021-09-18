@@ -1,3 +1,5 @@
+//! THIS IS IN big-o.rs
+
 use crate::{
     conditionals::{OUTPUT},
     big_o_analysis::{
@@ -506,8 +508,11 @@ macro_rules! assert_complexity {
 }
 
 
-#[cfg(test)]
+#[cfg(any(test, feature="dox"))]
 mod tests {
+
+    //! Unit tests for [big-o] module
+
     use super::*;
     use crate:: {
         conditionals::{self, ALLOC},
@@ -522,7 +527,7 @@ mod tests {
     /// Attests that the right report structures are produced for all possible CRUD tests:
     ///   - progress is reported per pass, per operation (operation = create, read, update or delete)
     ///   - sub-reports are only created when 'iterations_per_pass' for the operation is > 0
-    #[test]
+    #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn analyze_crud_algorithm_output_check() {
         let iterations_per_pass = 100000;
@@ -605,7 +610,7 @@ mod tests {
 
     /// Attests the same number of iterations are produced regardless of the number of threads:
     ///   - 'iterations_per_pass must' be a multiple of 'n_threads'
-    #[test]
+    #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn thread_chunk_division() {
         let iterations_per_pass = 1000;
@@ -641,7 +646,7 @@ mod tests {
     /// Attests the best case CRUD for vectors -- Create, Read, Update and Delete... all O(1):
     ///   - inserts at the end (push)
     ///   - deletes at the end (pop)
-    #[test]
+    #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn vec_best_case_algorithm_analysis() {
         let iterations_per_pass: u32 = 400_000*conditionals::LOOP_MULTIPLIER;
@@ -681,7 +686,7 @@ mod tests {
     ///   - Create always at the beginning -- O(n)
     ///   - Delete always at the beginning -- O(n)
     ///   - Reads and updates as the usual O(1)
-    #[test]
+    #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn vec_worst_case_algorithm_analysis() {
         let iterations_per_pass: u32 = 25_000/* *conditionals::LOOP_MULTIPLIER*/;
@@ -719,7 +724,7 @@ mod tests {
     }
 
     /// Attests O(1) performance characteristics for HashMaps
-    #[test]
+    #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn hashmap_algorithm_analysis() {
         let iterations_per_pass = 30_000*conditionals::LOOP_MULTIPLIER;

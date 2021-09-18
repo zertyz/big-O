@@ -9,16 +9,15 @@
 //!       to be still incomplete regarding this area (generics & const fn's)
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::mem::MaybeUninit;
-
-
-///// temporary constant in use while Rust still do not allow this module to be fully generic
-//pub const RING_BUFFER_SIZE: usize = 16;
+use std::io::ErrorKind;
+use std::fmt::{Display, Formatter};
 
 
 /// Represents a concurrent, zero-copy, zero-cost multiple-consumers Ringer buffer.\
-/// Create a new ring buffer of [u32]s with:
-/// ```no_compile
-///   let ring_buffer = crate::big_O::ring_buffer::RingBuffer::<u32>::new();
+/// Create a new ring buffer with 1024 [u32] slots with:
+/// ```
+///   let ring_buffer = crate::big_o::ring_buffer::RingBuffer::<u32, 1024>::new();
+/// ```
 pub struct RingBuffer<Slot, const RING_BUFFER_SIZE: usize> {
     /// if ahead of [published_tail], indicates a new slot is being filled in, to soon be published
     reserved_tail: AtomicU32,
@@ -56,8 +55,6 @@ impl<Slot, const RING_BUFFER_SIZE: usize> RingBuffer<Slot, RING_BUFFER_SIZE> {
         //              so this function may received an immutable &self and (unsafely) transform it into mutable
         //              to put in the new element
         let mutable_buffer = unsafe {
-//            let buffer = self.buffer.assume_init();
-            //let const_ptr = &self.buffer as *const [Slot; RING_BUFFER_SIZE];
             let const_ptr = self.buffer.as_ptr();
             let mut_ptr = const_ptr as *mut [Slot; RING_BUFFER_SIZE];
             &mut *mut_ptr
@@ -82,19 +79,20 @@ impl<Slot, const RING_BUFFER_SIZE: usize> RingBuffer<Slot, RING_BUFFER_SIZE> {
 
 
 /// Provides a "reasonably concurrent" ring-buffer consumer, to be created with:
-/// ```no_compile
-///           let ring_buffer = crate::big_O::ring_buffer::RingBuffer::new();
-///           let consumer = ring_buffer.new_consumer();
+/// ```
+///    let ring_buffer = crate::big_o::ring_buffer::RingBuffer::<u32, 1024>::new();
+///    let consumer = ring_buffer.new_consumer();
 /// ```
 /// Concurrency note: since, by design, we can have multiple consumers and, for this very reason, the producer is unaware of
 /// any consumer state, buffer overflows are not detectable by the producer. Even here, on the consumer, it is only
-/// detectable when the buffer overflow happens *before* a call to [dequeue()] or [peek_all()] -- if it happens after
-/// either of these returns but *before* the references are used, we fall into a **rather silent race condition**.
+/// detectable when the buffer overflow happens *before* a call to [dequeue()](RingBufferConsumer::dequeue()) or
+/// [peek_all()](RingBufferConsumer::peek_all()) -- if it happens after either of these returns but *before* the
+/// references are used, we fall into a **rather silent race condition**.
 ///
 /// There is no way to avoid that possibility (remember: zero-copy & zero-cost multiple consumers), only to reduce it's effects by:
 ///   1) Using a big-enough ring-buffer size -- so the buffer won't ever cycle around between *enqueueing* and *using the consumed references*;
 ///   2) Use the references as fast as possible -- so the *event production speed* won't ever be enough to allow the ring-buffer to cycle around before consumption is done;
-///   3) **for the next version:** Design your logic to use [is_reference_valid()], to be called after you're done with the value -- allowing you to check if a race condition happened.
+///   3) **for the next version:** Design your logic to use something like 'is_reference_valid()', to be called after you're done with the value -- allowing you to check if a race condition happened.
 ///
 /// If these 3 steps are not enough, you might consider using a non-zero-cost multiple consumers ring-buffer, a non-zero-copy one or even a
 /// single-consumer ring-buffer. If you know of a way of solving this limitation here, please contact me.
@@ -152,17 +150,19 @@ impl<'a, Slot, const RING_BUFFER_SIZE: usize> RingBufferConsumer<'a, Slot, RING_
     /// The rather wired return type is to avoid heap allocations: a fixed array of two slices of the
     /// ring buffer are returned -- the second slice is used if the sequence of references cycles
     /// through the buffer. Use this method like the following:
-    /// ```no_compile
-    ///   let ring_buffer = RingBuffer::new();
+    /// ```
+    ///   # fn main() -> std::io::Result<()> {
+    ///   let ring_buffer = crate::big_o::ring_buffer::RingBuffer::<u32, 1024>::new();
     ///   let consumer = ring_buffer.new_consumer();
     ///   // if you don't care for allocating a vector:
     ///   let peeked_references = consumer.peek_all()?.concat();
     ///   // if you require zero-allocations:
     ///   for peeked_chunk in consumer.peek_all()? {
     ///     for peeked_reference in peeked_chunk {
-    ///       your_logic_goes_here(*peeked_reference);
+    ///       println!("your_logic_goes_here: {:#?}", *peeked_reference);
     ///     }
     ///   }
+    ///   # Ok(())}
     pub fn peek_all(&self) -> Result<[&[Slot];2], RingBufferOverflowError> {
         let head = self.head.load(Ordering::Relaxed);
         let published_tail = self.ring_buffer.published_tail.load(Ordering::Relaxed);
@@ -198,15 +198,29 @@ impl<'a, Slot, const RING_BUFFER_SIZE: usize> RingBufferConsumer<'a, Slot, RING_
 /// can no longer be retrieved due to the number of calls to [RingBuffer::enqueue()] causing the ring-buffer
 /// to cycle over, overwriting that still-unconsumed slot position in the buffer.\
 /// In this case, the consumer instance is no longer valid -- any further operations on it will yield this same error.\
-/// A descriptive message is returned in [msg].
+/// A descriptive message is returned in [RingBufferOverflowError::msg].
 #[derive(Debug)]
 pub struct RingBufferOverflowError {
+    /// Contains details on the error. It is not public, but is accessible through *Debug* & *Display* traits
     msg: String,
+}
+impl Display for RingBufferOverflowError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RingBufferOverflowError: {}", self.msg)
+    }
+}
+impl std::error::Error for RingBufferOverflowError {}
+impl From<RingBufferOverflowError> for std::io::Error {
+    fn from(custom_error: RingBufferOverflowError) -> Self {
+        std::io::Error::new(ErrorKind::InvalidInput, custom_error)
+    }
 }
 
 
-#[cfg(test)]
+#[cfg(any(test, feature="dox"))]
 mod tests {
+
+    //! Unit tests for [ring_buffer](super) module -- using 'serial_test' crate so not to interfere with time measurements from other modules.
 
     use super::*;
 
@@ -214,7 +228,8 @@ mod tests {
     use std::fmt::Debug;
 
 
-    #[test]
+    /// standard use cases assertions for our ring buffer
+    #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn simple_enqueue_dequeue_use_cases() {
         let ring_buffer = RingBuffer::<i32, 16>::new();
@@ -266,7 +281,8 @@ mod tests {
         }
     }
 
-    #[test]
+    /// [RingBufferConsumer::peek_all()] specification & assertions
+    #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn peek() -> Result<(), RingBufferOverflowError> {
         let ring_buffer = RingBuffer::<u32, 16>::new();
@@ -316,7 +332,7 @@ mod tests {
     }
 
     /// ensures enqueueing can take place unharmed, but dequeueing & peek_all are prevented (with a meaningful error message) when buffer overflows happens
-    #[test]
+    #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn buffer_overflowing() {
         let ring_buffer = RingBuffer::<i32, 16>::new();
@@ -349,7 +365,7 @@ mod tests {
 
     /// uses varying number of threads for both enqueue / dequeue operations and performs all-in / all-out as well as single-in / single-out tests,
     /// asserting the dequeued element sums are always correct
-    #[test]
+    #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn concurrency() {
 

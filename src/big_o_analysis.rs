@@ -154,8 +154,10 @@ pub enum BigOAlgorithmType {
 }
 
 
-#[cfg(test)]
+#[cfg(any(test, feature="dox"))]
 mod tests {
+
+    //! Unit tests for [low_level_analysis](super) module -- using 'serial_test' crate in order to make time measurements more reliable.
 
     use super::*;
 
@@ -175,8 +177,8 @@ mod tests {
 
     const BUSY_LOOP_DELAY: u32 = 999*conditionals::LOOP_MULTIPLIER;
 
-    /// assures serializations & implementors of [Display] from [types] work as they should
-    #[test]
+    /// assures serializations & implementors of *Display* from [types] work as they should
+    #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn serialization() {
         OUTPUT("BigOAlgorithmComplexity enum members, as strings:\n");
@@ -195,7 +197,7 @@ mod tests {
     }
 
     /// tests time & space complexity analysis on real constant set algorithms
-    #[test]
+    #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn analyse_constant_set_algorithm_real_test() {
 
@@ -305,7 +307,7 @@ mod tests {
     }
 
     /// tests time & space complexity analysis on real set resizing algorithms
-    #[test]
+    #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn analyse_set_resizing_algorithm_real_test() {
 

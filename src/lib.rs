@@ -1,3 +1,5 @@
+//! THIS IS IN lib.rs
+
 pub mod big_o;
 pub mod big_o_analysis;
 pub mod metrics_allocator;

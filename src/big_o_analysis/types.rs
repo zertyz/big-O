@@ -2,7 +2,8 @@
 
 use std::fmt::{Display, Formatter};
 
-/// return result for this module's main functions [analyse_constant_set_algorithm] & [analyse_set_resizing_algorithm]
+/// return result for this module's functions for analysing *constant set* & *set resizing* algorithms.
+/// See [super::time_analysis] & [super::space_analysis]
 pub struct BigOAlgorithmAnalysis<T: BigOAlgorithmMeasurements> {
     pub time_complexity:         BigOAlgorithmComplexity,
     pub space_complexity:        BigOAlgorithmComplexity,
