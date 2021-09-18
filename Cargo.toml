@@ -12,7 +12,7 @@ authors = ["zertyz"]
 [dependencies]
 crossbeam = "0.8"   # scoped threads
 
-[dev-dependencies]
+#[dev-dependencies]     # dev dependencies became normal dependencies since we're building docs for tests
 serial_test = "0.5"     # #[serial] annotation in tests to avoid running them in parallel
 parking_lot = "0.11"    # way faster than std mutex
 #more-asserts = "0.2"    # gives us assert_lt!() macro
@@ -28,3 +28,34 @@ panic = "abort"     # disables stack traces / stack unwiding
 
 #[release-dependencies]
 #jemallocator = "0.3.2"
+
+[features]
+dox = []
+
+# DOCUMENTATION
+# cargo doc --workspace --no-deps --document-private-items --features=dox
+
+# DEPENDENCIES (crates)
+# cargo depgraph --all-features | dot -x -Tsvg -o dependencies.svg
+# (install with cargo install cargo-depgraph)
+
+# DEPENDENCIES (program)
+# (install with cargo install cargo-modules)
+
+# MODULE dependencies
+# package="big-o"; layout="dot"; format="svg"; cargo modules generate graph --with-uses --package "${package}" --layout "$layout" | sed 's/label="uses"\|label="owns"/label=""/g' | sed 's|splines="line"|splines=true|g' | sed "s|${package}::||g" | sed 's|::|⸬|g' >modules.dot;
+# for duplicate_to_remove in "`cat modules.dot | sort -r | sed '$!N; /\(.* \-> .*\) \[label=".*\n\1.*"owns" edge/P;D'`"; do grep -vF -- "${duplicate_to_remove}" modules.dot >_modules.dot; mv _modules.dot modules.dot; done;
+# dot -x -T${format} -o modules.${format} modules.dot; rm modules.dot
+
+# TYPES
+# package="big-o"; layout="dot"; format="svg"; cargo modules generate graph --with-uses --with-types --package "${package}" --layout "$layout" | sed 's/label="uses"\|label="owns"/label=""/g' | sed 's|splines="line"|splines=true|g' | sed "s|${package}::||g" | sed 's|::|⸬|g' >types.dot;
+# for duplicate_to_remove in "`cat types.dot | sort -r | sed '$!N; /\(.* \-> .*\) \[label=".*\n\1.*"owns" edge/P;D'`"; do grep -vF -- "${duplicate_to_remove}" types.dot >_modules.dot; mv _types.dot types.dot; done;
+# dot -x -T${format} -o types.${format} types.dot; rm types.dot
+
+# FUNCTIONS -- doesn't include functions referenced in macros, sadly (update the ones above with knowledge from this)
+# package="big-o"; layout="dot"; format="svg"; name="functions"; cargo modules generate graph --with-uses --with-types --package "${package}" --layout "$layout" | sed 's/label="uses"\|label="owns"/label=""/g' | sed 's|splines="line"|splines=true|g' | sed "s|${package}::||g" | sed 's|::|⸬|g' >${name}.dot;
+# for duplicate_to_remove in "`cat ${name}.dot | grep -E ' // "const" node| // "enum" node| // "trait" node| // "struct" node' | sed 's|^\s*\("[^"]*"\).*$|\1|'`" "`cat ${name}.dot | sort -r | sed '$!N; /\(.* \-> .*\) \[label=".*\n\1.*"owns" edge/P;D'`"; do if [ "$duplicate_to_remove" != "" ]; then grep -vF -- "${duplicate_to_remove}" ${name}.dot >_${name}.dot; mv _${name}.dot ${name}.dot; fi; done;
+# dot -x -T${format} -o ${name}.${format} ${name}.dot; rm ${name}.dot
+
+# old
+# package="big-o"; for layout in dot neato twopi circo fdp sfdp; do for format in svg pdf; do cargo modules generate graph --all-features --with-uses --with-types --with-tests --layout ${layout} --package "$package" | grep -v -E "\"${package}\" |label=\"owns\"" | sed 's|label="uses"|label=""|g' | sed 's|splines="line"|splines=true|g' | sed "s|${package}::||g" | sed 's|::|⸬|g' | dot -x -T${format} -o ${layout}.${format}; done; done
