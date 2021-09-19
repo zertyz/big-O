@@ -38,13 +38,17 @@ pub fn test_crud_algorithms<'a,
 
     // adapts the 'iterations_per_pass' to the 'attempt' number, so each retry uses slightly different values
     fn adapt(attempt: u32, iterations_per_pass: u32) -> u32 {
-        let factor = 10-((attempt/3)*2);
-        match attempt % 3 {
+        let factor = 10-(((attempt % 15)/3)*2); // [10,8,6,4,2,10,8,6,4,2,...]
+        match attempt {
             0 => iterations_per_pass,
-            1 => iterations_per_pass - (iterations_per_pass / factor),
-            2 => iterations_per_pass + (iterations_per_pass / factor),
-            _ => panic!("fix this match")
+            _ => match (attempt-1) % 3 {
+                0 => iterations_per_pass / factor,
+                1 => iterations_per_pass - (iterations_per_pass / factor),
+                2 => iterations_per_pass + (iterations_per_pass / factor),
+                _ => panic!("fix this match")
+            }
         }
+
     }
 
     let mut collected_errors = Vec::<CRUDComplexityAnalysisError>::with_capacity(max_retry_attempts as usize);
