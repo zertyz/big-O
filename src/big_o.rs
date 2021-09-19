@@ -38,7 +38,7 @@ pub fn test_crud_algorithms<'a,
 
     // adapts the 'iterations_per_pass' to the 'attempt' number, so each retry uses slightly different values
     fn adapt(attempt: u32, iterations_per_pass: u32) -> u32 {
-        let factor = ((attempt/3)+1)*10;
+        let factor = 10-((attempt/3)*2);
         match attempt % 3 {
             0 => iterations_per_pass,
             1 => iterations_per_pass - (iterations_per_pass / factor),
