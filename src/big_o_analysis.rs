@@ -166,7 +166,7 @@ mod tests {
     use crate::big_o_analysis::space_analysis::*;
 
     use crate::{
-        conditionals::{self,OUTPUT},
+        conditionals::{OUTPUT},
         big_o_analysis::types::{TimeUnit,TimeUnits}
     };
 
@@ -174,8 +174,6 @@ mod tests {
     use std::convert::TryInto;
 
     use serial_test::serial;
-
-    const BUSY_LOOP_DELAY: u32 = 999*conditionals::LOOP_MULTIPLIER;
 
     /// assures serializations & implementors of *Display* from [types] work as they should
     #[cfg_attr(not(feature = "dox"), test)]
@@ -201,14 +199,14 @@ mod tests {
     #[serial(cpu)]
     fn analyse_constant_set_algorithm_real_test() {
 
-        const REPETITIONS: u32 = 3072;
+        const REPETITIONS: u32 = 1024;
         const PASS_1_SET_SIZE: u32 = REPETITIONS;
-        const PASS_2_SET_SIZE: u32 = REPETITIONS * 3;
+        const PASS_2_SET_SIZE: u32 = REPETITIONS * 4;
         const TIME_UNIT: &TimeUnit<u128> = &TimeUnits::MICROSECOND;
 
         fn o_1_select(mut _n: u32) -> u32 {
             // single element allocation & busy_loop time processing
-            let vec = vec![busy_loop(BUSY_LOOP_DELAY*5)];
+            let vec = vec![operation_simulator()];
             vec.iter().sum()
         }
 
@@ -221,11 +219,11 @@ mod tests {
             }
             let mut len = 0;
             while n > 0 {
-                r += busy_loop(BUSY_LOOP_DELAY/2);
+                r ^= operation_simulator();
                 n /= 2;
                 len += 1;
             }
-            let vec = Vec::<u32>::with_capacity(len*400);
+            let vec = Vec::<u32>::with_capacity(len*4096);
             r ^ (len as u32 + vec.iter().sum::<u32>())
         }
 
@@ -238,11 +236,11 @@ mod tests {
             }
             let mut len = 0;
             while n > 0 {
-                r += busy_loop(BUSY_LOOP_DELAY/32);
+                r ^= operation_simulator();
                 n -= 1;
                 len += 1;
             }
-            let vec = Vec::<u32>::with_capacity(len);
+            let vec = Vec::<u32>::with_capacity(len*4096);
             r ^ (len as u32 + vec.iter().sum::<u32>())
         }
 
@@ -283,7 +281,7 @@ mod tests {
                 },
             };
 
-            OUTPUT(&format!("\n{} (r={})\n", algorithm_analysis, r1+r2+r3));
+            OUTPUT(&format!("\n{} (r={})\n", algorithm_analysis, r1^r2^r3));
             algorithm_analysis
         };
 
@@ -311,11 +309,11 @@ mod tests {
     #[serial(cpu)]
     fn analyse_set_resizing_algorithm_real_test() {
 
-        const DELTA_SET_SIZE: u32 = 3072;
+        const DELTA_SET_SIZE: u32 = 1024;
 
         fn o_1_insert(mut _n: u32) -> u32 {
             // single element allocation & busy_loop time processing
-            let vec = vec![busy_loop(BUSY_LOOP_DELAY*2)];
+            let vec = vec![operation_simulator()];
             vec.iter().sum()
         }
 
@@ -323,7 +321,7 @@ mod tests {
             let mut r: u32 = 0;
             let mut len = if n==DELTA_SET_SIZE-1 {DELTA_SET_SIZE*2/3} else {0};
             while n > 0 {
-                r = r ^ busy_loop(BUSY_LOOP_DELAY/2);
+                r ^= operation_simulator();
                 n = n/2;
                 len += n;
             }
@@ -336,7 +334,7 @@ mod tests {
             let mut r: u32 = 0;
             let len = if n<=DELTA_SET_SIZE {(n/20)*(n/20)} else {(n/20)*(n/20)-(n/40)*(n/40)};
             while n > 1 {
-                r = r ^ busy_loop(BUSY_LOOP_DELAY/50);
+                r ^= operation_simulator();
                 n = n-2;
             }
             let vec = Vec::<u32>::with_capacity(len as usize * 400);
@@ -401,12 +399,12 @@ mod tests {
     }
 
    #[inline]
-    fn busy_loop(iterations: u32) -> u32 {
-        let mut r: u32 = iterations;
-        for i in 0..iterations {
-            r ^= i;
-        }
-        r
+   /// simulates a cpu bound operation using precise sleeping --
+   /// a random number is returned to avoid any call cancellation optimizations
+    fn operation_simulator() -> u32 {
+       const BUSY_LOOP_DELAY: u64 = 1;
+       spin_sleep::sleep(Duration::from_nanos(BUSY_LOOP_DELAY));
+       rand::random()
     }
 
     /// wrap around the original 'run_pass' to output intermediate results
