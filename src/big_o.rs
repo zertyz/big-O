@@ -689,7 +689,7 @@ mod tests {
     #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn vec_worst_case_algorithm_analysis() {
-        let iterations_per_pass: u32 = 20_480/* *conditionals::LOOP_MULTIPLIER*/;
+        let iterations_per_pass: u32 = 22_480 * std::cmp::min(2, conditionals::LOOP_MULTIPLIER);
         let n_threads = 1;
         let vec_locker = parking_lot::RwLock::new(Vec::<u32>::with_capacity(0));
         test_crud_algorithms("Vec Insert & Remove (worst case) with ParkingLot", 15,
