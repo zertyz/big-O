@@ -36,17 +36,33 @@ pub fn test_crud_algorithms<'a,
                        create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32,
                        time_unit: &'a TimeUnit<T>) where PassResult<'a, T>: Copy, T: Copy {                            // full report
 
+    // adapts the 'iterations_per_pass' to the 'attempt' number, so each retry uses different values
+    fn adapt(attempt: u32, iterations_per_pass: u32) -> u32 {
+        match attempt % 3 {
+            0 => iterations_per_pass,
+            1 => iterations_per_pass - (iterations_per_pass / 10),
+            2 => iterations_per_pass + (iterations_per_pass / 10),
+            _ => panic!("fix this match")
+        }
+    }
+
     let mut collected_errors = Vec::<CRUDComplexityAnalysisError>::with_capacity(max_retry_attempts as usize);
 
     // in order to reduce false-negatives, retry up to 'max_retry_attempts' if time complexity don't match
     // the maximum acceptable create, read, update or delete 'expected_*_time_complexity'(ies)
     for attempt in 0..max_retry_attempts {
+
+        let adapted_create_iterations_per_pass = adapt(attempt, create_iterations_per_pass);
+        let   adapted_read_iterations_per_pass = adapt(attempt, read_iterations_per_pass);
+        let adapted_update_iterations_per_pass = adapt(attempt, update_iterations_per_pass);
+        let adapted_delete_iterations_per_pass = adapt(attempt, delete_iterations_per_pass);
+
         let crud_analysis = internal_analyze_crud_algorithms(crud_name, &reset_fn,
                                                              &create_fn,  expected_create_time_complexity, expected_create_space_complexity,
                                                              &read_fn,     expected_read_time_complexity, expected_read_space_complexity,
                                                              &update_fn, expected_update_time_complexity, expected_update_space_complexity,
                                                              &delete_fn, expected_delete_time_complexity, expected_delete_space_complexity,
-                                                             warmup_percentage, create_iterations_per_pass, read_iterations_per_pass, update_iterations_per_pass, delete_iterations_per_pass,
+                                                             warmup_percentage, adapted_create_iterations_per_pass, adapted_read_iterations_per_pass, adapted_update_iterations_per_pass, adapted_delete_iterations_per_pass,
                                                              create_threads, read_threads, update_threads, delete_threads,
                                                              time_unit);
 
@@ -707,12 +723,14 @@ mod tests {
                }, BigOAlgorithmComplexity::ON, BigOAlgorithmComplexity::O1,
                |n| {
                    let vec = vec_locker.read();
-                   vec[(n % iterations_per_pass) as usize]
+                   let len = vec.len();
+                   vec[n as usize % len]
                }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
                |n| {
                    let mut vec = vec_locker.write();
-                   vec[(n % iterations_per_pass) as usize] = n;
-                   vec.len() as u32
+                   let len = vec.len();
+                   vec[n as usize % len] = n+1;
+                   n+1
                }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
                |_n| {
                    let mut vec = vec_locker.write();
