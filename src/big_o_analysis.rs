@@ -238,7 +238,7 @@ mod tests {
             }
             let mut len = 0;
             while n > 0 {
-                r += busy_loop(BUSY_LOOP_DELAY/200);
+                r += busy_loop(BUSY_LOOP_DELAY/32);
                 n -= 1;
                 len += 1;
             }
