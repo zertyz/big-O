@@ -205,7 +205,7 @@ mod tests {
         const TIME_UNIT: &TimeUnit<u128> = &TimeUnits::MICROSECOND;
 
         fn o_1_select(mut _n: u32) -> u32 {
-            // single element allocation & busy_loop time processing
+            // constant element allocation & single operation processing
             let mut vec = Vec::with_capacity(1024);
             vec.push(operation_simulator());
             vec.iter().sum::<u32>()
@@ -313,9 +313,10 @@ mod tests {
         const DELTA_SET_SIZE: u32 = 1024;
 
         fn o_1_insert(mut _n: u32) -> u32 {
-            // single element allocation & busy_loop time processing
-            let vec = vec![operation_simulator()];
-            vec.iter().sum()
+            // constant element allocation & single operation processing
+            let mut vec = Vec::with_capacity(1024);
+            vec.push(operation_simulator());
+            vec.iter().sum::<u32>()
         }
 
         fn o_log_n_insert(mut n: u32) -> u32 {
