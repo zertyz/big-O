@@ -36,12 +36,13 @@ pub fn test_crud_algorithms<'a,
                        create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32,
                        time_unit: &'a TimeUnit<T>) where PassResult<'a, T>: Copy, T: Copy {                            // full report
 
-    // adapts the 'iterations_per_pass' to the 'attempt' number, so each retry uses different values
+    // adapts the 'iterations_per_pass' to the 'attempt' number, so each retry uses slightly different values
     fn adapt(attempt: u32, iterations_per_pass: u32) -> u32 {
+        let factor = ((attempt/3)+1)*10;
         match attempt % 3 {
             0 => iterations_per_pass,
-            1 => iterations_per_pass - (iterations_per_pass / 10),
-            2 => iterations_per_pass + (iterations_per_pass / 10),
+            1 => iterations_per_pass - (iterations_per_pass / factor),
+            2 => iterations_per_pass + (iterations_per_pass / factor),
             _ => panic!("fix this match")
         }
     }
