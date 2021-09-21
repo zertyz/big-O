@@ -2,7 +2,7 @@
 
 use crate::{
     conditionals::{OUTPUT},
-    big_o_analysis::{
+    low_level_analysis::{
         self, run_pass, PassResult, BigOAlgorithmType,
         types::{BigOAlgorithmAnalysis, TimeUnit, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
                 BigOTimeMeasurements, BigOSpaceMeasurements,
@@ -537,7 +537,7 @@ mod tests {
     use super::*;
     use crate:: {
         conditionals::{self, ALLOC},
-        big_o_analysis::types::{TimeUnits, BigOAlgorithmMeasurements, BigOAlgorithmComplexity},
+        low_level_analysis::types::{TimeUnits, BigOAlgorithmMeasurements, BigOAlgorithmComplexity},
     };
 
     use serial_test::serial;

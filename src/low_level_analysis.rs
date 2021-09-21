@@ -11,7 +11,7 @@ pub mod space_analysis;
 
 use crate::{
     conditionals::{self},
-    big_o_analysis::{
+    low_level_analysis::{
         types::{TimeUnit, TimeUnits, BigOTimePassMeasurements, BigOSpacePassMeasurements},
     }
 };
@@ -161,13 +161,13 @@ mod tests {
 
     use super::*;
 
-    use crate::big_o_analysis::types::*;
-    use crate::big_o_analysis::time_analysis::*;
-    use crate::big_o_analysis::space_analysis::*;
+    use crate::low_level_analysis::types::*;
+    use crate::low_level_analysis::time_analysis::*;
+    use crate::low_level_analysis::space_analysis::*;
 
     use crate::{
         conditionals::{OUTPUT},
-        big_o_analysis::types::{TimeUnit,TimeUnits}
+        low_level_analysis::types::{TimeUnit, TimeUnits}
     };
 
     use std::ops::Range;

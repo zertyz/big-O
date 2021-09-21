@@ -1,6 +1,6 @@
 //! Contains functions to perform Algorithm's Time Complexity Analysis.
 
-use crate::big_o_analysis::types::*;
+use crate::low_level_analysis::types::*;
 
 /// Performs the algorithm analysis based on the 2 passes & measurements given, for an algorithm that does not alter the size of
 /// the set they operate on -- select/update, get, sort, fib...

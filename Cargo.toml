@@ -50,9 +50,9 @@ dox = []
 # dot -x -T${format} -o modules.${format} modules.dot; rm modules.dot
 
 # TYPES
-# package="big-o"; layout="dot"; format="svg"; cargo modules generate graph --with-uses --with-types --package "${package}" --layout "$layout" | sed 's/label="uses"\|label="owns"/label=""/g' | sed 's|splines="line"|splines=true|g' | sed "s|${package}::||g" | sed 's|::|⸬|g' >types.dot;
-# for duplicate_to_remove in "`cat types.dot | sort -r | sed '$!N; /\(.* \-> .*\) \[label=".*\n\1.*"owns" edge/P;D'`"; do grep -vF -- "${duplicate_to_remove}" types.dot >_modules.dot; mv _types.dot types.dot; done;
-# dot -x -T${format} -o types.${format} types.dot; rm types.dot
+# package="big-o"; layout="dot"; format="svg"; name="types"; cargo modules generate graph --with-uses --with-types --package "${package}" --layout "$layout" | sed 's/label="uses"\|label="owns"/label=""/g' | sed 's|splines="line"|splines=true|g' | sed "s|${package}::||g" | sed 's|::|⸬|g' >${name}.dot;
+# for duplicate_to_remove in "`cat ${name}.dot | grep -E ' // "fn" node' | sed 's|^\s*\("[^"]*"\).*$|\1|'`" "`cat ${name}.dot | sort -r | sed '$!N; /\(.* \-> .*\) \[label=".*\n\1.*"owns" edge/P;D'`"; do if [ "$duplicate_to_remove" != "" ]; then grep -vF -- "${duplicate_to_remove}" ${name}.dot >_${name}.dot; mv _${name}.dot ${name}.dot; fi; done;
+# dot -x -T${format} -o ${name}.${format} ${name}.dot; rm ${name}.dot
 
 # FUNCTIONS -- doesn't include functions referenced in macros, sadly (update the ones above with knowledge from this)
 # package="big-o"; layout="dot"; format="svg"; name="functions"; cargo modules generate graph --with-uses --with-types --package "${package}" --layout "$layout" | sed 's/label="uses"\|label="owns"/label=""/g' | sed 's|splines="line"|splines=true|g' | sed "s|${package}::||g" | sed 's|::|⸬|g' >${name}.dot;

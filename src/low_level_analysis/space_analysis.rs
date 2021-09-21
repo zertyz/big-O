@@ -7,7 +7,7 @@
 //! on an insertion, for example. Since the algorithm is supposed to run several times, the auxiliary memory tends to
 //! cause a negligible effect on the analysis, when compared to the non-auxiliary allocations (provided you algorithm is ok).
 //!
-use crate::big_o_analysis::types::*;
+use crate::low_level_analysis::types::*;
 
 /// Perform space complexity analysis for algorithms that do not alter the set size they operate on.
 /// Examples: fib(n), sort(n), bsearch, read, update
