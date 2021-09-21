@@ -291,8 +291,8 @@ fn internal_analyze_crud_algorithms<'a,
                             pass_2_measurements: $passes_results[1].space_measurements,
                         },
                     };
-                    let  time_complexity = big_o_analysis::time_analysis::  analyse_time_complexity_for_constant_set_algorithm(&measurements.passes_info, &measurements.time_measurements);
-                    let space_complexity = big_o_analysis::space_analysis::analyse_space_complexity_for_constant_set_algorithm(&measurements.passes_info, &measurements.space_measurements);
+                    let  time_complexity = low_level_analysis::time_analysis::  analyse_time_complexity_for_constant_set_algorithm(&measurements.passes_info, &measurements.time_measurements);
+                    let space_complexity = low_level_analysis::space_analysis::analyse_space_complexity_for_constant_set_algorithm(&measurements.passes_info, &measurements.space_measurements);
                     yield_analysis_or_return_with_error!($operation_name, measurements, $expected_time_complexity, $expected_space_complexity, time_complexity, space_complexity)
                 } else {
                     None
@@ -342,8 +342,8 @@ fn internal_analyze_crud_algorithms<'a,
                             pass_2_measurements: $passes_results[1].space_measurements,
                         },
                     };
-                    let  time_complexity = big_o_analysis::time_analysis::  analyse_time_complexity_for_set_resizing_algorithm(&measurements.passes_info, &measurements.time_measurements);
-                    let space_complexity = big_o_analysis::space_analysis::analyse_space_complexity_for_set_resizing_algorithm(&measurements.passes_info, &measurements.space_measurements);
+                    let  time_complexity = low_level_analysis::time_analysis::  analyse_time_complexity_for_set_resizing_algorithm(&measurements.passes_info, &measurements.time_measurements);
+                    let space_complexity = low_level_analysis::space_analysis::analyse_space_complexity_for_set_resizing_algorithm(&measurements.passes_info, &measurements.space_measurements);
                     yield_analysis_or_return_with_error!($operation_name, measurements, $expected_time_complexity, $expected_space_complexity, time_complexity, space_complexity)
                 } else {
                     None
