@@ -10,7 +10,7 @@
 //!
 //! Usage example:
 //! ```rust
-//!    use crate::big_o::conditionals::ALLOC;
+//!    use crate::big_o::configs::ALLOC;
 //!     let save_point = ALLOC.save_point();
 //!     let _vec = Vec::<u32>::with_capacity(1024);
 //!     let metrics = ALLOC.delta_statistics(&save_point);
@@ -296,7 +296,7 @@ mod tests {
     #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn usage_example() {
-        use crate::conditionals::ALLOC;
+        use crate::configs::ALLOC;
         let save_point = ALLOC.save_point();
         let _vec = Vec::<u32>::with_capacity(1024);
         let metrics = ALLOC.delta_statistics(&save_point);

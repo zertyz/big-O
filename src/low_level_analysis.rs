@@ -10,7 +10,7 @@ pub mod time_analysis;
 pub mod space_analysis;
 
 use crate::{
-    conditionals::{self},
+    configs::{self},
     low_level_analysis::{
         types::{TimeUnit, TimeUnits, BigOTimePassMeasurements, BigOSpacePassMeasurements},
     }
@@ -81,7 +81,7 @@ pub(crate) fn run_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync, ScalarDurat
         let i32_range = range.end as i32 .. range.start as i32;
         let chunk_size = (i32_range.end-i32_range.start)/threads as i32;
         let mut thread_handlers: Vec<crossbeam::thread::ScopedJoinHandle<ThreadLoopResult>> = Vec::with_capacity(threads as usize);
-        let allocator_savepoint = conditionals::ALLOC.save_point();
+        let allocator_savepoint = configs::ALLOC.save_point();
         for n in 0..threads as i32 {
             let chunked_range = i32_range.start+chunk_size*n..i32_range.start+chunk_size*(n+1);
             thread_handlers.push( scope.spawn(move |_| thread_loop(algorithm, algorithm_type, chunked_range.start as u32 .. chunked_range.end as u32)) );
@@ -101,7 +101,7 @@ pub(crate) fn run_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync, ScalarDurat
             r ^= thread_r;
         }
 
-        let allocator_statistics = conditionals::ALLOC.delta_statistics(&allocator_savepoint);
+        let allocator_statistics = configs::ALLOC.delta_statistics(&allocator_savepoint);
 
         (PassResult {
             time_measurements:  BigOTimePassMeasurements {
@@ -166,7 +166,7 @@ mod tests {
     use crate::low_level_analysis::space_analysis::*;
 
     use crate::{
-        conditionals::{OUTPUT},
+        configs::{OUTPUT},
         low_level_analysis::types::{TimeUnit, TimeUnits}
     };
 

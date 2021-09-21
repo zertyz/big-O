@@ -1,7 +1,7 @@
 //! THIS IS IN big-o.rs
 
 use crate::{
-    conditionals::{OUTPUT},
+    configs::{OUTPUT},
     low_level_analysis::{
         self, run_pass, PassResult, BigOAlgorithmType,
         types::{BigOAlgorithmAnalysis, TimeUnit, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
@@ -536,7 +536,7 @@ mod tests {
 
     use super::*;
     use crate:: {
-        conditionals::{self, ALLOC},
+        configs::{self, ALLOC},
         low_level_analysis::types::{TimeUnits, BigOAlgorithmMeasurements, BigOAlgorithmComplexity},
     };
 
@@ -670,7 +670,7 @@ mod tests {
     #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn vec_best_case_algorithm_analysis() {
-        let iterations_per_pass: u32 = 250_000*conditionals::LOOP_MULTIPLIER;
+        let iterations_per_pass: u32 = 250_000* configs::LOOP_MULTIPLIER;
         let n_threads = 1;
         let vec_locker = parking_lot::RwLock::new(Vec::<u32>::with_capacity(0));
         test_crud_algorithms("Vec Push & Pop (best case) with ParkingLot", 15,
@@ -710,7 +710,7 @@ mod tests {
     #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn vec_worst_case_algorithm_analysis() {
-        let iterations_per_pass: u32 = 16_384 * std::cmp::min(2, conditionals::LOOP_MULTIPLIER);
+        let iterations_per_pass: u32 = 16_384 * std::cmp::min(2, configs::LOOP_MULTIPLIER);
         let n_threads = 1;
         let vec_locker = parking_lot::RwLock::new(Vec::<u32>::with_capacity(0));
         test_crud_algorithms("Vec Insert & Remove (worst case) with ParkingLot", 15,
@@ -750,7 +750,7 @@ mod tests {
     #[cfg_attr(not(feature = "dox"), test)]
     #[serial(cpu)]
     fn hashmap_algorithm_analysis() {
-        let iterations_per_pass = 30_000*conditionals::LOOP_MULTIPLIER;
+        let iterations_per_pass = 30_000* configs::LOOP_MULTIPLIER;
         let n_threads = 1;
         let allocator_save_point = ALLOC.save_point();
         let map_locker = Arc::new(parking_lot::RwLock::new(HashMap::<String, u32>::with_capacity(2 * iterations_per_pass as usize)));
