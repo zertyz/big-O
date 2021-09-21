@@ -1,6 +1,7 @@
 //! THIS IS IN lib.rs
 
-pub mod big_o;
+pub mod analysis;
+pub mod crud_analysis;
 pub mod low_level_analysis;
 pub mod metrics_allocator;
 pub mod configs;
