@@ -2,9 +2,12 @@
 
 use crate::{
     configs::{OUTPUT},
+    analysis::{
+        types::{BigOAlgorithmAnalysis},
+    },
     low_level_analysis::{
         self, run_pass, PassResult, BigOAlgorithmType,
-        types::{BigOAlgorithmAnalysis, TimeUnit, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
+        types::{TimeUnit, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
                 BigOTimeMeasurements, BigOSpaceMeasurements,
                 SetResizingAlgorithmPassesInfo, ConstantSetAlgorithmPassesInfo, BigOAlgorithmComplexity},
     }
@@ -532,7 +535,7 @@ macro_rules! assert_complexity {
 #[cfg(any(test, feature="dox"))]
 mod tests {
 
-    //! Unit tests for [big-o] module
+    //! Unit tests for [crud_analysis](super) module -- using 'serial_test' crate in order to make time measurements more reliable.
 
     use super::*;
     use crate:: {
@@ -549,7 +552,7 @@ mod tests {
     ///   - progress is reported per pass, per operation (operation = create, read, update or delete)
     ///   - sub-reports are only created when 'iterations_per_pass' for the operation is > 0
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
+    #[serial]                                  // needed since considerable RAM is used (which may interfere with 'crud_analysis.rs' tests)
     fn analyze_crud_algorithm_output_check() {
         let iterations_per_pass = 100000;
 
@@ -632,7 +635,6 @@ mod tests {
     /// Attests the same number of iterations are produced regardless of the number of threads:
     ///   - 'iterations_per_pass must' be a multiple of 'n_threads'
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
     fn thread_chunk_division() {
         let iterations_per_pass = 1000;
         for n_threads in [1,2,4,5,10] {
@@ -668,7 +670,7 @@ mod tests {
     ///   - inserts at the end (push)
     ///   - deletes at the end (pop)
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
+    #[serial]
     fn vec_best_case_algorithm_analysis() {
         let iterations_per_pass: u32 = 250_000* configs::LOOP_MULTIPLIER;
         let n_threads = 1;
@@ -708,7 +710,7 @@ mod tests {
     ///   - Delete always at the beginning -- O(n)
     ///   - Reads and updates as the usual O(1)
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
+    #[serial]
     fn vec_worst_case_algorithm_analysis() {
         let iterations_per_pass: u32 = 16_384 * std::cmp::min(2, configs::LOOP_MULTIPLIER);
         let n_threads = 1;
@@ -748,7 +750,7 @@ mod tests {
 
     /// Attests O(1) performance characteristics for HashMaps
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
+    #[serial]
     fn hashmap_algorithm_analysis() {
         let iterations_per_pass = 30_000* configs::LOOP_MULTIPLIER;
         let n_threads = 1;

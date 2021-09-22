@@ -7,6 +7,9 @@
 use std::io::{stdout,stderr,Write};
 use crate::metrics_allocator::MetricsAllocator;
 
+/// acceptable variance / measurement errors when analysing algorithm's time & space complexities
+pub const PERCENT_TOLERANCE: f64 = 0.10;
+
 #[cfg(debug_assertions)]
 /// loop multiplier for debug compilation
 pub const LOOP_MULTIPLIER: u32 = 1;

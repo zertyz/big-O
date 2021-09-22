@@ -230,7 +230,6 @@ mod tests {
 
     /// standard use cases assertions for our ring buffer
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
     fn simple_enqueue_dequeue_use_cases() {
         let ring_buffer = RingBuffer::<i32, 16>::new();
         let consumer = ring_buffer.new_consumer();
@@ -283,7 +282,6 @@ mod tests {
 
     /// [RingBufferConsumer::peek_all()] specification & assertions
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
     fn peek() -> Result<(), RingBufferOverflowError> {
         let ring_buffer = RingBuffer::<u32, 16>::new();
         let consumer = ring_buffer.new_consumer();
@@ -333,7 +331,7 @@ mod tests {
 
     /// ensures enqueueing can take place unharmed, but dequeueing & peek_all are prevented (with a meaningful error message) when buffer overflows happens
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
+    #[serial]                 // needed since considerable RAM is used (which may interfere with 'crud_analysis.rs' tests)
     fn buffer_overflowing() {
         let ring_buffer = RingBuffer::<i32, 16>::new();
         let consumer = ring_buffer.new_consumer();
@@ -366,7 +364,7 @@ mod tests {
     /// uses varying number of threads for both enqueue / dequeue operations and performs all-in / all-out as well as single-in / single-out tests,
     /// asserting the dequeued element sums are always correct
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
+    #[serial]
     fn concurrency() {
 
         let ring_buffer = RingBuffer::<u32, 1024>::new();

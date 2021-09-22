@@ -8,9 +8,9 @@
 pub mod types;
 pub mod time_analysis;
 pub mod space_analysis;
+pub mod configs;
 
 use crate::{
-    configs::{self},
     low_level_analysis::{
         types::{TimeUnit, TimeUnits, BigOTimePassMeasurements, BigOSpacePassMeasurements},
     }
@@ -159,15 +159,25 @@ mod tests {
 
     //! Unit tests for [low_level_analysis](super) module -- using 'serial_test' crate in order to make time measurements more reliable.
 
-    use super::*;
 
-    use crate::low_level_analysis::types::*;
-    use crate::low_level_analysis::time_analysis::*;
-    use crate::low_level_analysis::space_analysis::*;
+    use super::*;
 
     use crate::{
         configs::{OUTPUT},
-        low_level_analysis::types::{TimeUnit, TimeUnits}
+        analysis::{
+            types::{BigOAlgorithmAnalysis},
+        },
+        low_level_analysis::{
+            types::{
+                BigOAlgorithmComplexity,
+                BigOTimeMeasurements, BigOSpaceMeasurements,
+                ConstantSetAlgorithmPassesInfo,   SetResizingAlgorithmPassesInfo,
+                ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
+                TimeUnit, TimeUnits
+            },
+            time_analysis::*,
+            space_analysis::*
+        },
     };
 
     use std::ops::Range;
@@ -177,7 +187,6 @@ mod tests {
 
     /// assures serializations & implementors of *Display* from [types] work as they should
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
     fn serialization() {
         OUTPUT("BigOAlgorithmComplexity enum members, as strings:\n");
         let enum_members = [
@@ -196,7 +205,7 @@ mod tests {
 
     /// tests time & space complexity analysis on real constant set algorithms
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
+    #[serial]
     fn analyse_constant_set_algorithm_real_test() {
 
         const REPETITIONS: u32 = 1024;
@@ -307,7 +316,7 @@ mod tests {
 
     /// tests time & space complexity analysis on real set resizing algorithms
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
+    #[serial]
     fn analyse_set_resizing_algorithm_real_test() {
 
         const DELTA_SET_SIZE: u32 = 1024;

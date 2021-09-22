@@ -1,6 +1,9 @@
 //! Contains functions to perform Algorithm's Time Complexity Analysis.
 
-use crate::low_level_analysis::types::*;
+use crate::low_level_analysis::{
+    types::*,
+    configs::*,
+};
 
 /// Performs the algorithm analysis based on the 2 passes & measurements given, for an algorithm that does not alter the size of
 /// the set they operate on -- select/update, get, sort, fib...
@@ -90,16 +93,16 @@ pub fn analyse_time_complexity_for_set_resizing_algorithm<ScalarTimeUnit: Copy>(
     time_complexity
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature="dox"))]
 mod tests {
+
+    //! Unit tests for [time_analysis](super) module
 
     use super::*;
 
-    use serial_test::serial;
 
     /// test the time complexity analysis results based on some known-to-be-correct measurement times
     #[test]
-    #[serial(cpu)]
     fn analyse_constant_set_algorithm_theoretical_test() {
 
         let assert = |measurement_name, expected_complexity, passes_info: ConstantSetAlgorithmPassesInfo, time_measurements: BigOTimeMeasurements<_>| {
@@ -153,7 +156,6 @@ mod tests {
 
     /// test the time complexity analysis results based on some known-to-be-correct measurement times
     #[test]
-    #[serial(cpu)]
     fn analyse_set_resizing_algorithm_theoretical_test() {
 
         let assert = |measurement_name, expected_complexity, passes_info: SetResizingAlgorithmPassesInfo, time_measurements: BigOTimeMeasurements<_>| {
@@ -206,7 +208,6 @@ mod tests {
 
     /// test the time complexity analysis results progression when measurements increase
     #[test]
-    #[serial(cpu)]
     fn smooth_transitions() {
 
         // constant_set

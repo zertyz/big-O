@@ -7,7 +7,11 @@
 //! on an insertion, for example. Since the algorithm is supposed to run several times, the auxiliary memory tends to
 //! cause a negligible effect on the analysis, when compared to the non-auxiliary allocations (provided you algorithm is ok).
 //!
-use crate::low_level_analysis::types::*;
+
+use crate::low_level_analysis::{
+    types::*,
+    configs::*,
+};
 
 /// Perform space complexity analysis for algorithms that do not alter the set size they operate on.
 /// Examples: fib(n), sort(n), bsearch, read, update
@@ -92,16 +96,16 @@ pub fn analyse_space_complexity_for_set_resizing_algorithm(passes_info:  &SetRes
     time_complexity
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature="dox"))]
 mod tests {
+
+    //! Unit tests for [space_analysis](super) module
 
     use super::*;
 
-    use serial_test::serial;
 
     /// test the space complexity analysis results based on some known-to-be-correct measurement sizes
     #[test]
-    #[serial(cpu)]
     fn analyse_constant_set_algorithm_theoretical_test() {
 
         let assert = |measurement_name, expected_complexity, passes_info: ConstantSetAlgorithmPassesInfo, space_measurements: BigOSpaceMeasurements| {
@@ -215,7 +219,6 @@ mod tests {
 
     /// test the space complexity analysis results based on some known-to-be-correct measurement sizes
     #[test]
-    #[serial(cpu)]
     fn analyse_set_resizing_algorithm_theoretical_test() {
 
         let assert = |measurement_name, expected_complexity, passes_info: SetResizingAlgorithmPassesInfo, space_measurements: BigOSpaceMeasurements| {
@@ -336,7 +339,6 @@ mod tests {
 
     /// test the space complexity analysis results progression when measurements increase
     #[test]
-    #[serial(cpu)]
     fn smooth_transitions() {
 
         // constant_set

@@ -286,15 +286,13 @@ unsafe impl<'a, const RING_BUFFER_SIZE: usize> GlobalAlloc for MetricsAllocator<
 #[cfg(any(test, feature="dox"))]
 mod tests {
 
-    //! Unit tests for [metrics_allocator](super) module -- using 'serial_test' crate so not to interfere with time measurements from other modules.
+    //! Unit tests for [metrics_allocator](super) module
 
     use super::*;
 
-    use serial_test::serial;
 
     /// the same code used in [metrics_allocator](super) module docs, proving it is available in test time
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
     fn usage_example() {
         use crate::configs::ALLOC;
         let save_point = ALLOC.save_point();
@@ -306,7 +304,6 @@ mod tests {
     /// uses the metrics computation functions to simulate a bunch of allocations / deallocations,
     /// checking the [save_point()](MetricsAllocator::save_point()) and [delta_statistics()](MetricsAllocator::delta_statistics())  results
     #[cfg_attr(not(feature = "dox"), test)]
-    #[serial(cpu)]
     fn test_save_point_min_and_max_memory_usage() {
         let allocator = MetricsAllocator::<16>::new();
         let mut used_mem = 0usize;

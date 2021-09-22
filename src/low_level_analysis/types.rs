@@ -2,24 +2,6 @@
 
 use std::fmt::{Display, Formatter};
 
-/// return result for this module's functions for analysing *constant set* & *set resizing* algorithms.
-/// See [super::time_analysis] & [super::space_analysis]
-pub struct BigOAlgorithmAnalysis<T: BigOAlgorithmMeasurements> {
-    pub time_complexity:         BigOAlgorithmComplexity,
-    pub space_complexity:        BigOAlgorithmComplexity,
-    pub algorithm_measurements:  T,
-}
-impl<T: BigOAlgorithmMeasurements> Display for BigOAlgorithmAnalysis<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}\
-                   --> Algorithm  Time Analysis: {}\n\
-                   --> Algorithm Space Analysis: {} ({space_measurements})\n",
-               self.algorithm_measurements,
-               self.time_complexity.as_time_pretty_str(),
-               self.space_complexity.as_space_pretty_str(), space_measurements=self.algorithm_measurements.space_measurements())
-    }
-}
-
 /// Possible time & space complexity analysis results, in big-O notation.
 /// Results are for a single operation -- remember a pass have several operations,
 /// so the time for the analysis should have '* 2 * p' added -- 'p' being the size
@@ -300,6 +282,3 @@ impl TimeUnits {
         &TimeUnit::<T>::CONST_DEFAULT
     }
 }
-
-/// acceptable variance / measurement errors when analysing algorithm's time & space complexities
-pub(crate) const PERCENT_TOLERANCE: f64 = 0.10;
