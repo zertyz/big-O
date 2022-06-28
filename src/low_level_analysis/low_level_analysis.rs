@@ -150,7 +150,6 @@ mod tests {
 
 
     use super::*;
-
     use crate::{
         configs::{OUTPUT},
         low_level_analysis::{
@@ -165,11 +164,12 @@ mod tests {
             space_analysis::*
         },
     };
-
-    use std::ops::Range;
-    use std::convert::TryInto;
-
+    use std::{
+        ops::Range,
+        convert::TryInto,
+    };
     use serial_test::serial;
+
 
     /// assures serializations & implementors of *Display* from [types] work as they should
     #[cfg_attr(not(feature = "dox"), test)]

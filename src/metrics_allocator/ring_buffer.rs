@@ -354,7 +354,6 @@ mod tests {
     #[cfg_attr(not(feature = "dox"), test)]
     #[serial]
     fn concurrency() {
-
         let ring_buffer = RingBuffer::<u32, 40960>::new();
         let consumer = ring_buffer.consumer();
 

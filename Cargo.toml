@@ -15,12 +15,15 @@ authors = ["zertyz"]
 crossbeam = "0.8"   # scoped threads
 
 #[dev-dependencies]     # dev dependencies became normal dependencies since we're building docs for tests
-serial_test = "0.5"     # #[serial] annotation in tests to avoid running them in parallel
-parking_lot = "0.11"    # way faster than std mutex
 spin_sleep = "1.0"      # precise sleeping, avoiding busy loops on some tests
 rand = "0.8"            # used by some tests to avoid call cancellation optimizations when running in release mode
 #more-asserts = "0.2"    # gives us assert_lt!() macro
 #retry = "1.3"           # retry side-effect-less operations -- in our case, retry failed analysis
+
+[dev-dependencies]
+ctor = "0.1"            # initializer functions -- that run before main
+serial_test = "0.8.0"   # run tests serially
+parking_lot = "0.11"    # way faster than std mutex
 
 # see https://deterministic.space/high-performance-rust.html
 [profile.release]
