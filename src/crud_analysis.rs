@@ -267,7 +267,7 @@ fn internal_analyze_crud_algorithms<'a,
     ///   - [number_of_iterations_per_pass] -- u32: either [read_iterations_per_pass] or [update_iterations_per_pass]
     ///   - [number_of_threads] -- u32: either [read_threads] or [update_threads]
     macro_rules! run_constant_set_pass {
-        ($pass_number: expr, $operation_name: literal, $suffix: literal, $passes_results: ident,
+        ($pass_number: expr, $operation_name: literal, $suffix: expr, $passes_results: ident,
          $algorithm_closure: ident, $expected_time_complexity: ident, $expected_space_complexity: ident,
          $number_of_iterations_per_pass: expr, $number_of_threads: ident) => {
             if $number_of_iterations_per_pass > 0 {
@@ -319,7 +319,7 @@ fn internal_analyze_crud_algorithms<'a,
     ///   - [number_of_iterations_per_pass] -- u32: either [create_iterations_per_pass] or [delete_iterations_per_pass]
     ///   - [number_of_threads] -- u32: either [create_threads] or [delete_threads]
     macro_rules! run_set_resizing_pass {
-        ($pass_number: expr, $operation_name: literal, $suffix: literal, $result_prefix_closure: expr,
+        ($pass_number: expr, $operation_name: literal, $suffix: ident, $result_prefix_closure: expr,
          $passes_results: ident, $range_fn: ident, $last_pass_number: expr,
          $algorithm_closure: ident, $expected_time_complexity: ident, $expected_space_complexity: ident,
          $number_of_iterations_per_pass: expr, $number_of_threads: ident) => {
@@ -392,26 +392,30 @@ fn internal_analyze_crud_algorithms<'a,
     }
 
     macro_rules! run_create_pass {
-        ($pass_number: expr) => {
-            run_set_resizing_pass!($pass_number, "Create", ", ", |_pass_number: u32, pass_name: &str| format!("{}: ", pass_name.to_ascii_lowercase()),
+        ($pass_number: expr) => {{
+            let suffix = if read_iterations_per_pass > 0 || update_iterations_per_pass > 0 {", "} else {""};
+            run_set_resizing_pass!($pass_number, "Create", suffix, |_pass_number: u32, pass_name: &str| format!("{}: ", pass_name.to_ascii_lowercase()),
                                    create_passes_results, calc_regular_cru_range, NUMBER_OF_PASSES-1,
                                    create_fn, expected_create_time_complexity, expected_create_space_complexity,
                                    create_iterations_per_pass, create_threads)
-        }
+        }}
     }
     macro_rules! run_read_pass {
-        ($pass_number: expr) => {
-            run_constant_set_pass!($pass_number, "Read", ", ", read_passes_results, read_fn, expected_read_time_complexity, expected_read_space_complexity, read_iterations_per_pass, read_threads)
-        }
+        ($pass_number: expr) => {{
+            let suffix = if update_iterations_per_pass > 0 {", "} else {""};
+            run_constant_set_pass!($pass_number, "Read", suffix, read_passes_results, read_fn, expected_read_time_complexity, expected_read_space_complexity, read_iterations_per_pass, read_threads)
+        }}
     }
     macro_rules! run_update_pass {
-        ($pass_number: expr) => {
-            run_constant_set_pass!($pass_number, "Update", "", update_passes_results, update_fn, expected_update_time_complexity, expected_update_space_complexity, update_iterations_per_pass, update_threads)
-        }
+        ($pass_number: expr) => {{
+            let suffix = "";
+            run_constant_set_pass!($pass_number, "Update", suffix, update_passes_results, update_fn, expected_update_time_complexity, expected_update_space_complexity, update_iterations_per_pass, update_threads)
+        }}
     }
     macro_rules! run_delete_pass {
-        ($pass_number: expr) => {
-            run_set_resizing_pass!($pass_number, "Delete", "",
+        ($pass_number: expr) => {{
+            let suffix = "";
+            run_set_resizing_pass!($pass_number, "Delete", suffix,
                                    |pass_number: u32, _pass_name: &str|
                                        if pass_number == NUMBER_OF_PASSES-1 {
                                          "2nd: "
@@ -421,7 +425,7 @@ fn internal_analyze_crud_algorithms<'a,
                                    delete_passes_results, calc_regular_d_range, 0,
                                    delete_fn, expected_delete_time_complexity, expected_delete_space_complexity,
                                    delete_iterations_per_pass, delete_threads)
-        }
+        }}
     }
 
 
@@ -559,14 +563,54 @@ mod tests {
         // high level asserting functions
         /////////////////////////////////
 
-        fn assert_contains_status(report: &str, excerpt: &str) {
-            assert!(report.contains(excerpt), "no '{}' status was found on the full report", excerpt);
-        }
-        fn assert_does_not_contain_status(report: &str, excerpt: &str) {
-            assert!(!report.contains(excerpt), "found '{}' status on the full report, where it shouldn't be", excerpt);
-        }
         fn assert_contains_algorithm_report<T: BigOAlgorithmMeasurements>(report: &str, algorithm_analysis: Option<BigOAlgorithmAnalysis<T>>, algorithm_name: &str) {
             assert!(report.contains(&algorithm_analysis.unwrap().to_string()), "couldn't find '{}' report analysis on the full report", algorithm_name);
+        }
+        fn assert_passes_progress(report: &str, warmup: bool, create: bool, read: bool, update: bool, delete: bool) {
+            if warmup {
+                let warmup_announcement = format!("warming up [{}{}{}{}] ",
+                                                  if create {"C"} else {""},
+                                                  if read   {"R"} else {""},
+                                                  if update {"U"} else {""},
+                                                  if delete {"D"} else {""});
+                assert!(report.contains(&warmup_announcement), "'Warmup' announcement was not properly issued -- no '{}' announcement was found on the full report", warmup_announcement);
+                assert!(report.contains(", First Pass ("),     "'warming up' & 'First Pass' announcements seem not to be in sync -- they used to be separated by a comma when the former one is present");
+            } else {
+                assert!(!report.contains("warming up "), "'Warmup' announcement was present on the full report, even when it wasn't requested");
+            }
+            if create {
+                let first_pass_announcement = "First Pass (create: ";
+                let second_pass_announcement = "Second Pass (create: ";
+                assert!(report.contains(first_pass_announcement), "'First Pass' announcement of the 'create' step seems wrong");
+                assert!(report.contains(second_pass_announcement), "'Second Pass' announcement of the 'create' step seems wrong");
+            } else {
+                assert!(!report.contains("create: "), "'create' step announcement was present on the full report, even when that step wasn't requested");
+            }
+            if read {
+                let first_pass_announcement  = if create {"b, read: "} else {"First Pass (read: "};
+                let second_pass_announcement = if create {"b, read: "} else {"Second Pass (read: "};
+                assert!(report.contains(first_pass_announcement), "'First Pass' announcement of the 'read' step seems wrong when 'create' is {}present", if create {""} else {"not "});
+                assert!(report.contains(second_pass_announcement), "'Second Pass' announcement of the 'read' step seems wrong when 'create' is {}present", if create {""} else {"not "});
+            } else {
+                assert!(!report.contains("read: "), "'read' step announcement was present on the full report, even when that step wasn't requested");
+            }
+            if update {
+                let first_pass_announcement  = if create || read {"b, update: "} else {"First Pass (update: "};
+                let second_pass_announcement = if create || read {"b, update: "} else {"Second Pass (update: "};
+                assert!(report.contains(first_pass_announcement), "'First Pass' announcement of the 'update' step seems wrong when 'create'/'read' are {}present", if create || read {""} else {"not "});
+                assert!(report.contains(second_pass_announcement), "'Second Pass' announcement of the 'update' step seems wrong when 'create'/'read' are {}present", if create || read {""} else {"not "});
+            } else {
+                assert!(!report.contains("update: "), "'update' step announcement was present on the full report, even when that step wasn't requested");
+            }
+            let delete_passes_announcement = "Delete Passes (";
+            if delete {
+                assert!(report.contains(delete_passes_announcement), "'Delete' announcement was not properly issued -- no '{}' announcement was found on the full report", delete_passes_announcement);
+            } else {
+                assert!(!report.contains(delete_passes_announcement), "'Delete' announcement was present on the full report, even when it wasn't requested");
+            }
+            assert!(!report.contains(",); Second Pass ("), "comma handling at the end of the 'First Pass' announcement is wrong");
+            assert!(!report.contains(" ); Second Pass ("), "space handling at end end of the 'First Pass' announcement is wrong");
+            assert!(report.contains("b):\n"), "comma / space handling at the end of the 'Second Pass' announcement seems wrong");
         }
 
         // checks
@@ -588,11 +632,7 @@ mod tests {
                                                1, 1, 1, 1,
                                                &TimeUnits::NANOSECOND);
         assert!(report.contains("MyContainer"), "CRUD name not present on the full report");
-        assert_contains_status(&report, "warming up [CRUD] ");
-        assert_contains_status(&report, "create:");
-        assert_contains_status(&report, "read:");
-        assert_contains_status(&report, "update:");
-        assert_contains_status(&report, "Delete Passes");
+        assert_passes_progress(&report, true, true, true, true, true);
         assert_contains_algorithm_report(&report, create_analysis, "Create");
         assert_contains_algorithm_report(&report, read_analysis, "Read");
         assert_contains_algorithm_report(&report, update_analysis, "Update");
@@ -612,7 +652,7 @@ mod tests {
                                                0/* no warmup */, iterations_per_pass, iterations_per_pass, iterations_per_pass, iterations_per_pass,
                                                1, 1, 1, 1,
                                                &TimeUnits::NANOSECOND);
-        assert_does_not_contain_status(&report, "warmup:");
+        assert_passes_progress(&report, false, true, true, true, true);
 
         // no delete as well
         let (_create_analysis,
@@ -625,11 +665,27 @@ mod tests {
                                               &|n| (n+1)/(n+1),
                                               |n| (n+1)/(n+1),
                                               |_n| panic!("'delete_fn' should not be called if there is no warmup taking place"),
-                                              0/*no warmup*/, iterations_per_pass, iterations_per_pass, iterations_per_pass, 0/*no delete*/,
+                                              0/*no warmup*/, iterations_per_pass, iterations_per_pass, iterations_per_pass, 0,
                                               1, 1, 1, 0,
                                               &TimeUnits::NANOSECOND);
-        assert_does_not_contain_status(&report, "Delete Passes");
+        assert_passes_progress(&report, false, true, true, true, false);
         assert!(delete_analysis.is_none(), "No Delete Complexity Analysis should have been made");
+
+        // just create
+        let (_create_analysis,
+            _read_analysis,
+            _update_analysis,
+            _delete_analysis,
+            report) = analyze_crud_algorithms("MyContainer",
+                                              |_n| panic!("'reset_fn' should not be called if there is no warmup taking place"),
+                                              |n| (n+1)/(n+1),
+                                              &|n| panic!("'read_fn' should not be called if there is no warmup taking place"),
+                                              |n| panic!("'update_fn' should not be called if there is no warmup taking place"),
+                                              |_n| panic!("'delete_fn' should not be called if there is no warmup taking place"),
+                                              0/*no warmup*/, iterations_per_pass, 0, 0, 0,
+                                              1, 1, 1, 1,
+                                              &TimeUnits::NANOSECOND);
+        assert_passes_progress(&report, false, true, false, false, false);
     }
 
     /// Attests the same number of iterations are produced regardless of the number of threads:

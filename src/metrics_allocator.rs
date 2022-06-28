@@ -1,4 +1,4 @@
-//! Global allocator (wrapper around the System's default allocator) capable of gathering allocation/deallocation/reallocation metrics
+//! Global allocator (wrapper around the System's default allocator) capable of gathering allocation/de-allocation/re-allocation metrics
 //! and (min, max) memory usage between two (or more) points in time.
 //!
 //! Activate it with:
@@ -79,11 +79,13 @@ pub struct MetricsAllocatorSavePoint<'a, const RING_BUFFER_SIZE: usize> {
 
 }
 
-/// ring buffer slot -- used to allow memory usage tracking over several save points
+/// Represents a "save point" -- and is used as a ring buffer slot.
+/// Used to allow memory usage tracking for several "save points"
+/// (measured against the runtime situation).
 struct SavePointRingBufferSlot<NumericType> {
-    /// contains the minimum used memory between the previous save_point and this one
+    /// contains the minimum used memory between this "save point" and the current runtime
     min_used_memory: NumericType,
-    /// contains the maximum used memory between the previous save_point and this one
+    /// contains the maximum used memory between this "save point" and the current runtime
     max_used_memory: NumericType,
 }
 impl Default for SavePointRingBufferSlot<usize> {
@@ -103,8 +105,8 @@ impl Default for SavePointRingBufferSlot<AtomicUsize> {
     }
 }
 
-/// The replacement for the System's Global Allocator allocator.
-/// Please see this module's docs for more info and usage examples.
+/// The replacement for the System's Global Allocator.\
+/// See [self] for more info.
 pub struct MetricsAllocator<'a, const RING_BUFFER_SIZE: usize> {
     system_allocator:        &'a System,
     statistics:              MetricsAllocatorStatistics<AtomicUsize>,
@@ -112,7 +114,8 @@ pub struct MetricsAllocator<'a, const RING_BUFFER_SIZE: usize> {
 }
 impl<'a, const RING_BUFFER_SIZE: usize> MetricsAllocator<'a, RING_BUFFER_SIZE> {
 
-    /// Please see this module's docs for more info and usage examples.
+    /// Creates an instance capable of replacing the Global Allocator.\
+    /// See [self] for more info.
     pub const fn new() -> Self {
         Self {
             system_allocator: &System,
@@ -134,16 +137,15 @@ impl<'a, const RING_BUFFER_SIZE: usize> MetricsAllocator<'a, RING_BUFFER_SIZE> {
         }
     }
 
-    /// Prepares a new measurement for future allocations, to be inferred by [delta_statistics()](MetricsAllocator::delta_statistics()).\
-    /// Please see this module's docs for more info and usage examples.
+    /// Prepares a new measurement for future allocations, to be inferred by [delta_statistics()](MetricsAllocator::delta_statistics()).
     pub fn save_point(&self) -> MetricsAllocatorSavePoint<RING_BUFFER_SIZE> {
-        // add the current (min,max) to the ring buffer and start a new counter.
+        // add the current (min,max) to the ring buffer and start a new counter
         // the new consumer will consume any further saved_points + the current (min,max)
         self.used_memory_ring_buffer.enqueue(SavePointRingBufferSlot {
             min_used_memory: self.statistics.min_used_memory.load(Ordering::Relaxed),
             max_used_memory: self.statistics.max_used_memory.load(Ordering::Relaxed),
         });
-        let used_memory_ring_buffer_consumer = self.used_memory_ring_buffer.new_consumer();
+        let used_memory_ring_buffer_consumer = self.used_memory_ring_buffer.consumer();
         self.statistics.min_used_memory.store(self.statistics.current_used_memory.load(Ordering::Relaxed), Ordering::Relaxed);
         self.statistics.max_used_memory.store(self.statistics.current_used_memory.load(Ordering::Relaxed), Ordering::Relaxed);
         MetricsAllocatorSavePoint {
@@ -165,9 +167,8 @@ impl<'a, const RING_BUFFER_SIZE: usize> MetricsAllocator<'a, RING_BUFFER_SIZE> {
         }
     }
 
-    /// Returns the allocation statistics between now and the point in time which 'save_point' was generated
+    /// Returns the allocation statistics between now and the point in time when `save_point` was generated
     /// (with a call to [save_point()](MetricsAllocator::save_point())).
-    /// Please see this module's docs for more info and usage examples.
     pub fn delta_statistics(&self, save_point: &MetricsAllocatorSavePoint<RING_BUFFER_SIZE>) -> MetricsAllocatorStatistics<usize> {
         let mut min = usize::MAX;
         let mut max = usize::MIN;
@@ -205,7 +206,7 @@ impl<'a, const RING_BUFFER_SIZE: usize> MetricsAllocator<'a, RING_BUFFER_SIZE> {
         self.compute_min_and_max_used_memories();
     }
 
-    /// compute metrics for deallocation
+    /// compute metrics for de-allocation
     fn compute_dealloc_metrics(&self, layout: &Layout) {
         self.statistics.deallocations_count.fetch_add(1, Ordering::Relaxed);
         self.statistics.deallocated_bytes.fetch_add(layout.size(), Ordering::Relaxed);
@@ -221,7 +222,7 @@ impl<'a, const RING_BUFFER_SIZE: usize> MetricsAllocator<'a, RING_BUFFER_SIZE> {
         self.compute_min_and_max_used_memories();
     }
 
-    /// compute metrics for reallocation
+    /// compute metrics for re-allocation
     fn compute_realloc_metrics(&self, layout: &Layout, new_size: usize) {
         self.statistics.reallocations_count.fetch_add(1, Ordering::Relaxed);
         self.statistics.reallocated_originals_bytes.fetch_add(layout.size(), Ordering::Relaxed);
@@ -291,7 +292,7 @@ mod tests {
     use super::*;
 
 
-    /// the same code used in [metrics_allocator](super) module docs, proving it is available in test time
+    /// the same code used in [metrics_allocator](super) module docs
     #[cfg_attr(not(feature = "dox"), test)]
     fn usage_example() {
         use crate::configs::ALLOC;
@@ -301,7 +302,7 @@ mod tests {
         println!("Allocator Metrics for the Vec allocation: {}", metrics);
     }
 
-    /// uses the metrics computation functions to simulate a bunch of allocations / deallocations,
+    /// uses the metrics computation functions to simulate a bunch of allocations / de-allocations,
     /// checking the [save_point()](MetricsAllocator::save_point()) and [delta_statistics()](MetricsAllocator::delta_statistics())  results
     #[cfg_attr(not(feature = "dox"), test)]
     fn test_save_point_min_and_max_memory_usage() {
