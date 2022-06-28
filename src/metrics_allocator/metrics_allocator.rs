@@ -1,26 +1,10 @@
-//! Global allocator (wrapper around the System's default allocator) capable of gathering allocation/de-allocation/re-allocation metrics
-//! and (min, max) memory usage between two (or more) points in time.
-//!
-//! Activate it with:
-//! ```no_compile
-//!     use crate::big_O::metrics_allocator::MetricsAllocator;
-//!     #[global_allocator]
-//!     static ALLOC: MetricsAllocator = MetricsAllocator::new();
-//! ```
-//!
-//! Usage example:
-//! ```rust
-//!    use crate::big_o::configs::ALLOC;
-//!     let save_point = ALLOC.save_point();
-//!     let _vec = Vec::<u32>::with_capacity(1024);
-//!     let metrics = ALLOC.delta_statistics(&save_point);
-//!     println!("Allocator Metrics for the Vec allocation: {}", metrics);
+//! See [super]
 
 use std::fmt::{Formatter, Display};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::alloc::{System, GlobalAlloc, Layout};
 
-use crate::ring_buffer::{RingBuffer, RingBufferConsumer};
+use crate::metrics_allocator::ring_buffer::{RingBuffer, RingBufferConsumer};
 
 /// struct returned by [MetricsAllocator::delta_statistics()]
 pub struct MetricsAllocatorStatistics<NumericType> {

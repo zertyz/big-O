@@ -2,13 +2,10 @@
 
 use crate::{
     configs::{OUTPUT},
-    analysis::{
-        types::{BigOAlgorithmAnalysis},
-    },
     low_level_analysis::{
         self, run_pass, PassResult, BigOAlgorithmType,
         types::{TimeUnit, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
-                BigOTimeMeasurements, BigOSpaceMeasurements,
+                BigOAlgorithmAnalysis, BigOTimeMeasurements, BigOSpaceMeasurements,
                 SetResizingAlgorithmPassesInfo, ConstantSetAlgorithmPassesInfo, BigOAlgorithmComplexity},
     }
 };
@@ -188,6 +185,7 @@ struct CRUDComplexityAnalysisError {
     pub failed_analysis:      String,
     pub failed_complexity:    BigOAlgorithmComplexity,
     pub failed_assertion_msg: String,
+    #[allow(dead_code)]
     pub partial_report:       String,
 }
 impl Display for CRUDComplexityAnalysisError {
@@ -679,8 +677,8 @@ mod tests {
             report) = analyze_crud_algorithms("MyContainer",
                                               |_n| panic!("'reset_fn' should not be called if there is no warmup taking place"),
                                               |n| (n+1)/(n+1),
-                                              &|n| panic!("'read_fn' should not be called if there is no warmup taking place"),
-                                              |n| panic!("'update_fn' should not be called if there is no warmup taking place"),
+                                              &|_n| panic!("'read_fn' should not be called if there is no warmup taking place"),
+                                              |_n| panic!("'update_fn' should not be called if there is no warmup taking place"),
                                               |_n| panic!("'delete_fn' should not be called if there is no warmup taking place"),
                                               0/*no warmup*/, iterations_per_pass, 0, 0, 0,
                                               1, 1, 1, 1,

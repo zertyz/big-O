@@ -13,7 +13,7 @@ use std::fmt::{Display, Formatter};
 /// Represents a concurrent, zero-copy, zero-cost multiple-consumers Ringer buffer.\
 /// Create a new ring buffer with 1024 [u32] slots with:
 /// ```
-///   let ring_buffer = crate::big_o::ring_buffer::RingBuffer::<u32, 1024>::new();
+///   let ring_buffer = big_o::metrics_allocator::ring_buffer::RingBuffer::<u32, 1024>::new();
 /// ```
 /// Note: for optimization purposes, make the ring buffer size a power of 2 -- so that the modulus operation gets optimized to a bit shift instruction.\
 /// See [self] for more info.
@@ -77,7 +77,7 @@ impl<Slot, const RING_BUFFER_SIZE: usize> RingBuffer<Slot, RING_BUFFER_SIZE> {
 
 /// Provides a ring-buffer consumer, to be created with:
 /// ```
-///    let ring_buffer = crate::big_o::ring_buffer::RingBuffer::<u32, 1024>::new();
+///    let ring_buffer = big_o::metrics_allocator::ring_buffer::RingBuffer::<u32, 1024>::new();
 ///    let consumer = ring_buffer.consumer();
 /// ```
 /// Concurrency note: since, by design, we can have multiple consumers and, for this very reason, the producer is unaware of
@@ -140,7 +140,7 @@ impl<'a, Slot, const RING_BUFFER_SIZE: usize> RingBufferConsumer<'a, Slot, RING_
     /// through the buffer. Use this method like the following:
     /// ```
     ///   # fn main() -> std::io::Result<()> {
-    ///   let ring_buffer = crate::big_o::ring_buffer::RingBuffer::<u32, 1024>::new();
+    ///   let ring_buffer = big_o::metrics_allocator::ring_buffer::RingBuffer::<u32, 1024>::new();
     ///   let consumer = ring_buffer.consumer();
     ///   // if you don't care for allocating a vector:
     ///   let peeked_references = consumer.peek_all()?.concat();
