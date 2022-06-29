@@ -362,7 +362,7 @@ mod tests {
         for threads in 1..16 {
 
             let start = 0;
-            let finish = 40960;
+            let finish = 40960/10;
 
             // all-in (populate)
             multi_threaded_iterate(start, finish, threads, |i| ring_buffer.enqueue(i));
@@ -385,7 +385,7 @@ mod tests {
         // See the module docs.)
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         let start = 0;
-        let finish = 92600;
+        let finish = 92600/10;
         let threads = 16;    // might as well be num_cpus::get();
 
         let expected_sum = (start + (finish-1)) * ( (finish - start) / 2 );

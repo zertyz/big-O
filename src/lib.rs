@@ -1,6 +1,6 @@
-//! THIS IS IN lib.rs
+#![doc = include_str!("../README.md")]
 
-pub mod crud_analysis;
+pub mod runners;
 pub mod low_level_analysis;
 pub mod metrics_allocator;
 pub mod configs;
@@ -8,10 +8,13 @@ pub mod configs;
 
 // exported symbols
 pub use {
+    configs::{ALLOC, OUTPUT},
     low_level_analysis::types::{
         BigOAlgorithmComplexity,
         TimeUnits,
     },
-    configs::{ALLOC,OUTPUT},
-    crud_analysis::test_crud_algorithms,
+    runners::{
+        standard::test_constant_set_algorithm,
+        crud::test_crud_algorithms,
+    },
 };

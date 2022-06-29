@@ -2,9 +2,9 @@
 name          = "big-o-test"
 version       = "0.2.1"
 edition       = "2021"
-description   = "(native) Types & operations to allow space efficient storage of dates and times"
+description   = "Enforces `space` and `time` Algorithm Complexity on tests"
 keywords      = ["algorithm", "analysis", "Big-O", "notation", "performance"]
-categories    = ["Algorithms", "Profiling", "Big-O"]
+categories    = ["development-tools", "development-tools::profiling", "development-tools::testing"]
 readme        = "README.md"
 authors       = ["Luiz Silveira <zertyz@gmail.com>"]
 homepage      = "https://github.com/zertyz/big-o"

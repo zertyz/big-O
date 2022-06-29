@@ -181,3 +181,52 @@ impl<T> Default for TimeUnit<T> {
         Self { unit_str: "N/A", duration_conversion_fn_ptr: |_| panic!("use of default TimeUnit") }
     }
 }
+
+
+#[cfg(any(test, feature="dox"))]
+mod tests {
+
+    //! Unit tests for [types_impl](super) submodule -- using 'serial_test' crate in order to make time measurements more reliable.
+
+
+    use crate::{
+        configs::{OUTPUT},
+        low_level_analysis::{
+            types::{
+                BigOAlgorithmComplexity, BigOAlgorithmAnalysis,
+                BigOTimeMeasurements, BigOSpaceMeasurements,
+                ConstantSetAlgorithmPassesInfo, SetResizingAlgorithmPassesInfo,
+                ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
+                TimeUnit, TimeUnits
+            },
+            time_analysis::*,
+            space_analysis::*
+        },
+        runners::common::{run_iterator_pass, PassResult},
+    };
+    use std::{
+        ops::Range,
+        convert::TryInto,
+    };
+    use serial_test::serial;
+
+
+    /// assures serializations & implementors of *Display* from [types] work as they should
+    #[cfg_attr(not(feature = "dox"), test)]
+    #[serial]
+    fn serialization() {
+        OUTPUT("BigOAlgorithmComplexity enum members, as strings:\n");
+        let enum_members = [
+            BigOAlgorithmComplexity::BetterThanO1,
+            BigOAlgorithmComplexity::O1,
+            BigOAlgorithmComplexity::OLogN,
+            BigOAlgorithmComplexity::BetweenOLogNAndON,
+            BigOAlgorithmComplexity::ON,
+            BigOAlgorithmComplexity::WorseThanON,
+        ];
+        for enum_member in enum_members {
+            OUTPUT(&format!("\t{:?} => '{}'\n", enum_member, enum_member.as_pretty_str()));
+        }
+        OUTPUT("\n");
+    }
+}

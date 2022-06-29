@@ -41,7 +41,7 @@ A special method is provided to test CRUD operations, as in the example bellow:
 
 ## Measurement output (optional)
 
-````
+````no_compile
 Vec Insert & Remove (worst case) with ParkingLot CRUD Algorithm Complexity Analysis:
   First Pass (create: 8090µs/+64.42KiB, read: 15254µs/+432.00b, update: 13948µs/+432.00b); Second Pass (create: 22440µs/+64.42KiB, read: 15232µs/+432.00b, update: 13839µs/+432.00b):
 
@@ -82,7 +82,7 @@ pass          Δt              Δs            Σn            t⁻
 ## Usage in projects
 
 Add this to your `Cargo.toml`:
-````
+````no_compile
 [dev-dependencies]
 ctor = "0.1"
 big-o-test = "0.2"

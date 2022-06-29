@@ -1,13 +1,15 @@
-//! THIS IS IN big-o.rs
+//! Contains facilities for CRUD algorithms to have their performance analyzed in test methods.\
+//! See [tests] and `tests/std_containers.rs` for examples.
 
 use crate::{
     configs::{OUTPUT},
     low_level_analysis::{
-        self, run_pass, PassResult, BigOAlgorithmType,
+        self, BigOAlgorithmType,
         types::{TimeUnit, ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
                 BigOAlgorithmAnalysis, BigOTimeMeasurements, BigOSpaceMeasurements,
                 SetResizingAlgorithmPassesInfo, ConstantSetAlgorithmPassesInfo, BigOAlgorithmComplexity},
-    }
+    },
+    runners::common::*,
 };
 use std::{
     convert::TryInto,
@@ -219,26 +221,13 @@ fn internal_analyze_crud_algorithms<'a,
                    Option< BigOAlgorithmAnalysis<SetResizingAlgorithmMeasurements<'a,T>> >,       // delete analysis
                    String), CRUDComplexityAnalysisError> where PassResult<'a, T>: Copy, T: Copy { // full report
 
-    let mut full_report = String::new();
+    let mut full_report = String::with_capacity(2048);
 
     // wrap around the original 'OUTPUT' function to capture the [full_report]
     let mut _output = |msg: &str| {
         full_report.push_str(msg);
         OUTPUT(msg);
     };
-
-    /// wrap around the original 'run_pass' to output intermediate results
-    fn run_pass_verbosely<'a,
-                          _AlgorithmClosure: Fn(u32) -> u32 + Sync,
-                          _OutputClosure:    FnMut(&str),
-                          T: TryInto<u64> + Copy> (result_prefix: &str, result_suffix: &str,
-                                                   algorithm: &_AlgorithmClosure, algorithm_type: &BigOAlgorithmType, range: Range<u32>, time_unit: &'a TimeUnit<T>,
-                                                   threads: u32, mut _output: _OutputClosure)
-                                                   -> (PassResult<'a,T>, u32) {
-        let (pass_result, r) = run_pass(algorithm, algorithm_type, range, time_unit, threads);
-        _output(&format!("{}{}/{}{}", result_prefix, pass_result.time_measurements, pass_result.space_measurements, result_suffix));
-        (pass_result, r)
-    }
 
     let mut create_passes_results = [PassResult::<T>::default(); NUMBER_OF_PASSES as usize];
     let mut   read_passes_results = [PassResult::<T>::default(); NUMBER_OF_PASSES as usize];
@@ -270,10 +259,10 @@ fn internal_analyze_crud_algorithms<'a,
          $algorithm_closure: ident, $expected_time_complexity: ident, $expected_space_complexity: ident,
          $number_of_iterations_per_pass: expr, $number_of_threads: ident) => {
             if $number_of_iterations_per_pass > 0 {
-                let (pass_result, pass_r) = run_pass_verbosely(&format!("{}: ", $operation_name.to_ascii_lowercase()), $suffix,
-                                                               &$algorithm_closure, &BigOAlgorithmType::SetResizing,
-                                                               calc_regular_cru_range($number_of_iterations_per_pass, $pass_number),
-                                                               time_unit, $number_of_threads, &mut _output);
+                let (pass_result, pass_r) = run_iterator_pass_verbosely(&format!("{}: ", $operation_name.to_ascii_lowercase()), $suffix,
+                                                                        &$algorithm_closure, &BigOAlgorithmType::SetResizing,
+                                                                        calc_regular_cru_range($number_of_iterations_per_pass, $pass_number),
+                                                                        time_unit, $number_of_threads, &mut _output);
                 $passes_results[$pass_number as usize] = pass_result;
                 r ^= pass_r;
                 if $pass_number == NUMBER_OF_PASSES-1 {
@@ -323,10 +312,10 @@ fn internal_analyze_crud_algorithms<'a,
          $algorithm_closure: ident, $expected_time_complexity: ident, $expected_space_complexity: ident,
          $number_of_iterations_per_pass: expr, $number_of_threads: ident) => {
             if $number_of_iterations_per_pass > 0 {
-                let (pass_result, pass_r) = run_pass_verbosely(&$result_prefix_closure($pass_number, $operation_name), $suffix,
-                                                               &$algorithm_closure, &BigOAlgorithmType::SetResizing,
-                                                               $range_fn($number_of_iterations_per_pass, $pass_number),
-                                                               time_unit, $number_of_threads, &mut _output);
+                let (pass_result, pass_r) = run_iterator_pass_verbosely(&$result_prefix_closure($pass_number, $operation_name), $suffix,
+                                                                        &$algorithm_closure, &BigOAlgorithmType::SetResizing,
+                                                                        $range_fn($number_of_iterations_per_pass, $pass_number),
+                                                                        time_unit, $number_of_threads, &mut _output);
                 $passes_results[$pass_number as usize] = pass_result;
                 r ^= pass_r;
                 if $pass_number == $last_pass_number {
@@ -442,22 +431,22 @@ fn internal_analyze_crud_algorithms<'a,
         io::stdout().flush().unwrap();
         if create_iterations_per_pass > 0 {
             _output(&"C");
-            let (_elapse, warmup_r) = run_pass(&create_fn, &BigOAlgorithmType::SetResizing, calc_warmup_cru_range(create_iterations_per_pass), time_unit, create_threads);
+            let (_elapse, warmup_r) = run_iterator_pass(&create_fn, &BigOAlgorithmType::SetResizing, calc_warmup_cru_range(create_iterations_per_pass), time_unit, create_threads);
             r ^= warmup_r;
         }
         if read_iterations_per_pass > 0 {
             _output(&"R");
-            let (_elapse, warmup_r) = run_pass(&read_fn, &BigOAlgorithmType::ConstantSet, calc_warmup_cru_range(read_iterations_per_pass), time_unit, read_threads);
+            let (_elapse, warmup_r) = run_iterator_pass(&read_fn, &BigOAlgorithmType::ConstantSet, calc_warmup_cru_range(read_iterations_per_pass), time_unit, read_threads);
             r ^= warmup_r;
         }
         if update_iterations_per_pass > 0 {
             _output(&"U");
-            let (_elapse, warmup_r) = run_pass(&update_fn, &BigOAlgorithmType::ConstantSet, calc_warmup_cru_range(update_iterations_per_pass), time_unit, update_threads);
+            let (_elapse, warmup_r) = run_iterator_pass(&update_fn, &BigOAlgorithmType::ConstantSet, calc_warmup_cru_range(update_iterations_per_pass), time_unit, update_threads);
             r ^= warmup_r;
         }
         if delete_iterations_per_pass > 0 {
             _output(&"D");
-            let (_elapse, warmup_r) = run_pass(&delete_fn, &BigOAlgorithmType::SetResizing, calc_warmup_d_range(delete_iterations_per_pass), time_unit, delete_threads);
+            let (_elapse, warmup_r) = run_iterator_pass(&delete_fn, &BigOAlgorithmType::SetResizing, calc_warmup_d_range(delete_iterations_per_pass), time_unit, delete_threads);
             r ^= warmup_r;
         }
         _output("] ");
@@ -690,6 +679,7 @@ mod tests {
     /// Attests the same number of iterations are produced regardless of the number of threads:
     ///   - 'iterations_per_pass must' be a multiple of 'n_threads'
     #[cfg_attr(not(feature = "dox"), test)]
+    #[serial]
     fn thread_chunk_division() {
         let iterations_per_pass = 1000;
         for n_threads in [1,2,4,5,10] {

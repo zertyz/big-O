@@ -102,10 +102,12 @@ mod tests {
     //! Unit tests for [space_analysis](super) module
 
     use super::*;
+    use serial_test::serial;
 
 
     /// test the space complexity analysis results based on some known-to-be-correct measurement sizes
     #[test]
+    #[serial]
     fn analyse_constant_set_algorithm_theoretical_test() {
 
         let assert = |measurement_name, expected_complexity, passes_info: ConstantSetAlgorithmPassesInfo, space_measurements: BigOSpaceMeasurements| {
@@ -219,6 +221,7 @@ mod tests {
 
     /// test the space complexity analysis results based on some known-to-be-correct measurement sizes
     #[test]
+    #[serial]
     fn analyse_set_resizing_algorithm_theoretical_test() {
 
         let assert = |measurement_name, expected_complexity, passes_info: SetResizingAlgorithmPassesInfo, space_measurements: BigOSpaceMeasurements| {
@@ -339,6 +342,7 @@ mod tests {
 
     /// test the space complexity analysis results progression when measurements increase
     #[test]
+    #[serial]
     fn smooth_transitions() {
 
         // constant_set

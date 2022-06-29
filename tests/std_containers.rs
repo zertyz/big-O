@@ -24,6 +24,26 @@ fn setup_env() {
 }
 
 
+#[test]
+fn quick_sort_reversed_vec() {
+    let mut vec1: Vec<u32> = (0..10000000).rev().collect();
+    let mut vec2: Vec<u32> = (0..20000000).rev().collect();
+    test_constant_set_algorithm(
+        "Quicksort a reversed vec", 15,
+        vec1.len() as u32, || {
+            vec1.sort();
+            vec1[12]
+        },
+        vec2.len() as u32, || {
+            vec2.sort();
+            vec2[14]
+        },
+        BigOAlgorithmComplexity::ON, BigOAlgorithmComplexity::ON,
+        &TimeUnits::MICROSECOND, || ()
+    )
+}
+
+
 /// Attests the best case CRUD for vectors -- Create, Read, Update and Delete... all O(1):
 ///   - inserts at the end (push)
 ///   - deletes at the end (pop)

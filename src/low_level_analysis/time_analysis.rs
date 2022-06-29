@@ -99,10 +99,12 @@ mod tests {
     //! Unit tests for [time_analysis](super) module
 
     use super::*;
+    use serial_test::serial;
 
 
     /// test the time complexity analysis results based on some known-to-be-correct measurement times
     #[test]
+    #[serial]
     fn analyse_constant_set_algorithm_theoretical_test() {
 
         let assert = |measurement_name, expected_complexity, passes_info: ConstantSetAlgorithmPassesInfo, time_measurements: BigOTimeMeasurements<_>| {
@@ -156,6 +158,7 @@ mod tests {
 
     /// test the time complexity analysis results based on some known-to-be-correct measurement times
     #[test]
+    #[serial]
     fn analyse_set_resizing_algorithm_theoretical_test() {
 
         let assert = |measurement_name, expected_complexity, passes_info: SetResizingAlgorithmPassesInfo, time_measurements: BigOTimeMeasurements<_>| {
@@ -208,6 +211,7 @@ mod tests {
 
     /// test the time complexity analysis results progression when measurements increase
     #[test]
+    #[serial]
     fn smooth_transitions() {
 
         // constant_set
