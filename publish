@@ -1,0 +1,38 @@
+#! /bin/bash
+
+echo "Releasing to crates.io:"
+
+echo -en "  Checking git status..."
+git status -s | grep -E ' M |\?\?' &&
+  echo " BAILING OUT: git is not clean -- commit and push pending changes before running this command" &&
+  exit 1
+echo " OK"
+
+echo -en "  Getting unpublished version stated in Cargo.tom..."
+UNPUBLISHED_VERSION=`grep --max-count 1 version Cargo.toml | sed 's|[^"]*"\(.*\)"|\1|'`
+echo " ${UNPUBLISHED_VERSION} OK"
+
+echo -en "  Publishing to crates.io:"
+cargo publish || exit 1
+
+echo -en "  Pushing new tag to git..."
+git tag -a "${UNPUBLISHED_VERSION}" -m "as released to crates.io" &&
+  git push origin --tags &&
+  echo " OK" || echo " FAILED"
+
+echo -en "  Preparing Cargo.toml for next version..."
+V_PREFIX=`echo ${UNPUBLISHED_VERSION} | sed "s|\(.*\.\)\(.*\)|\1|"`
+V_SUFFIX=`echo ${UNPUBLISHED_VERSION} | sed "s|\(.*\.\)\(.*\)|\2|"`
+NEXT_V_SUFFIX=$((V_SUFFIX+1))
+NEXT_VERSION="${V_PREFIX}${NEXT_V_SUFFIX}"
+echo -en " from ${UNPUBLISHED_VERSION} to ${NEXT_VERSION}..."
+  sed -i "s|version = \"${UNPUBLISHED_VERSION}\"|version = \"${NEXT_VERSION}\"|" Cargo.toml &&
+  echo " OK" || echo " FAILED"
+
+echo -en "  Committing & pushing Cargo.toml new version change..."
+git add Cargo.toml &&
+  git commit -m "crate's next version after publishing to crates.io" &&
+  git push &&
+  echo " OK" || echo " FAILED"
+
+echo "DONE"

@@ -1,43 +1,36 @@
-# RELEASE BUILDING:
-# RUSTFLAGS="-C target-cpu=native" cargo build --release
-
 [package]
-name = "big-o"
-version = "0.2.1"
-edition = "2021"
-authors = ["zertyz"]
+name          = "big-o"
+version       = "0.2.1"
+edition       = "2021"
+description   = "(native) Types & operations to allow space efficient storage of dates and times"
+keywords      = ["algorithm", "analysis", "Big-O", "notation", "performance"]
+categories    = ["Algorithms", "Profiling", "Big-O"]
+readme        = "README.md"
+authors       = ["Luiz Silveira <zertyz@gmail.com>"]
+homepage      = "https://github.com/zertyz/big-o"
+repository    = "https://github.com/zertyz/big-o"
+documentation = "https://docs.rs/big-o/"
+license       = "Unlicense"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
+
 
 [dependencies]
 crossbeam = "0.8"   # scoped threads
 
-#[dev-dependencies]     # dev dependencies became normal dependencies since we're building docs for tests
-spin_sleep = "1.0"      # precise sleeping, avoiding busy loops on some tests
-rand = "0.8"            # used by some tests to avoid call cancellation optimizations when running in release mode
-#more-asserts = "0.2"    # gives us assert_lt!() macro
-#retry = "1.3"           # retry side-effect-less operations -- in our case, retry failed analysis
 
-[dev-dependencies]
+[dev-dependencies]      # dev dependencies should become normal dependencies when building docs for tests
 ctor = "0.1"            # initializer functions -- that run before main
 serial_test = "0.8.0"   # run tests serially
 parking_lot = "0.11"    # way faster than std mutex
+spin_sleep = "1.0"      # precise sleeping, avoiding busy loops on some tests
+rand = "0.8"            # used by some tests to avoid call cancellation optimizations when running in release mode
 
-# see https://deterministic.space/high-performance-rust.html
-[profile.release]
-lto = "fat"
-codegen-units = 1
-panic = "abort"     # disables stack traces / stack unwiding
-#rustflags = ["-C", "target-cpu=native"]    # this seems not to work
-#overflow-checks = true     # might help debug release-only bugs
-
-#[release-dependencies]
-#jemallocator = "0.3.2"
 
 [features]
 dox = []
+
 
 # DOCUMENTATION
 # cargo doc --workspace --no-deps --document-private-items --features=dox
@@ -63,6 +56,3 @@ dox = []
 # package="big-o"; layout="dot"; format="svg"; name="functions"; cargo modules generate graph --with-uses --with-types --package "${package}" --layout "$layout" | sed 's/label="uses"\|label="owns"/label=""/g' | sed 's|splines="line"|splines=true|g' | sed "s|${package}::||g" | sed 's|::|⸬|g' >${name}.dot;
 # for duplicate_to_remove in "`cat ${name}.dot | grep -E ' // "const" node| // "enum" node| // "trait" node| // "struct" node' | sed 's|^\s*\("[^"]*"\).*$|\1|'`" "`cat ${name}.dot | sort -r | sed '$!N; /\(.* \-> .*\) \[label=".*\n\1.*"owns" edge/P;D'`"; do if [ "$duplicate_to_remove" != "" ]; then grep -vF -- "${duplicate_to_remove}" ${name}.dot >_${name}.dot; mv _${name}.dot ${name}.dot; fi; done;
 # dot -x -T${format} -o ${name}.${format} ${name}.dot; rm ${name}.dot
-
-# old
-# package="big-o"; for layout in dot neato twopi circo fdp sfdp; do for format in svg pdf; do cargo modules generate graph --all-features --with-uses --with-types --with-tests --layout ${layout} --package "$package" | grep -v -E "\"${package}\" |label=\"owns\"" | sed 's|label="uses"|label=""|g' | sed 's|splines="line"|splines=true|g' | sed "s|${package}::||g" | sed 's|::|⸬|g' | dot -x -T${format} -o ${layout}.${format}; done; done

@@ -1,20 +1,35 @@
 # the *big-O* crate
 
+[gh-image]: https://github.com/zertyz/big-o/workflows/Rust/badge.svg
+[gh-checks]: https://github.com/zertyz/big-o/actions/workflows/rust.yml
+[cratesio-image]: https://img.shields.io/crates/v/big-o.svg
+[cratesio]: https://crates.io/crates/big-o
+[docsrs-image]: https://docs.rs/big-o/badge.svg
+[docsrs]: https://docs.rs/big-o
+
+[![big-o GitHub Actions][gh-image]][gh-checks]
+[![big-o on crates.io][cratesio-image]][cratesio]
+[![big-o on docs.rs][docsrs-image]][docsrs]
+
+
 The `big-O` crate dynamically analyzes algorithms for *space* and *time* resource consumption, allowing tests to enforce a minimum
 complexity -- detecting, as soon as possible, eventual performance regressions.
+
+Browse the [Docs][docsrs].
+
 
 Reports are issued using the `Big O Notation` (hence the name) and it works by measuring how the
 algorithm's CPU times & RAM space requirements grow in relation to the amount of data that is applied to it.
 
 By using this crate on `tests`, you are enforcing -- through real measurements -- how your program
 should behave in regard to resource consumption -- allowing you to foresee the current resource requirements/limits and,
-eventually, helping in the process of optimization -- as you are free to do changes that are sure to cause a test failure,
-denying regressions in space or time complexities.
+eventually, helping in the process of optimization, as you are free to do changes that are sure to cause a test failure
+when regressions in space or time complexities are introduced.
 It is, as such, meant to work as a *development tool*, alongside with *tests* & *benchmarks*.
 
 Algorithms under analysis may fit into the following categories:
   * those that alter the amount of data they operate on -- such as inserts, deletes, extractions and loads (EtL)
-  * those that operate on a constant set -- such as queries and data transformations (eTl)
+  * those that operate on a constant data set -- such as queries and data transformations (eTl)
 
 A special method is provided to test CRUD operations, as in the example bellow:
 
