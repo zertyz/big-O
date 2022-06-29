@@ -1,6 +1,6 @@
 //! Applies the Big-O crate to some Rust's std lib containers
 
-use big_o::*;
+use big_o_test::*;
 use std::{
     sync::Arc,
     collections::HashMap,

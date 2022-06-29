@@ -10,7 +10,7 @@
 //!
 //! Usage example:
 //! ```rust
-//!    use crate::big_o::configs::ALLOC;
+//!    use crate::big_o_test::configs::ALLOC;
 //!     let save_point = ALLOC.save_point();
 //!     let _vec = Vec::<u32>::with_capacity(1024);
 //!     let metrics = ALLOC.delta_statistics(&save_point);

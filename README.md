@@ -1,18 +1,18 @@
-# the *big-O* crate
+# the *big-O-test* crate
 
 [gh-image]: https://github.com/zertyz/big-o/workflows/Rust/badge.svg
 [gh-checks]: https://github.com/zertyz/big-o/actions/workflows/rust.yml
-[cratesio-image]: https://img.shields.io/crates/v/big-o.svg
-[cratesio]: https://crates.io/crates/big-o
-[docsrs-image]: https://docs.rs/big-o/badge.svg
-[docsrs]: https://docs.rs/big-o
+[cratesio-image]: https://img.shields.io/crates/v/big-o-test.svg
+[cratesio]: https://crates.io/crates/big-o-test
+[docsrs-image]: https://docs.rs/big-o-test/badge.svg
+[docsrs]: https://docs.rs/big-o-test
 
-[![big-o GitHub Actions][gh-image]][gh-checks]
-[![big-o on crates.io][cratesio-image]][cratesio]
-[![big-o on docs.rs][docsrs-image]][docsrs]
+[![big-o-test GitHub Actions][gh-image]][gh-checks]
+[![big-o-test on crates.io][cratesio-image]][cratesio]
+[![big-o-test on docs.rs][docsrs-image]][docsrs]
 
 
-The `big-O` crate dynamically analyzes algorithms for *space* and *time* resource consumption, allowing tests to enforce a minimum
+The `big-O-test` crate dynamically analyzes algorithms for *space* and *time* resource consumption, allowing tests to enforce a minimum
 complexity -- detecting, as soon as possible, eventual performance regressions.
 
 Browse the [Docs][docsrs].
@@ -85,7 +85,7 @@ Add this to your `Cargo.toml`:
 ````
 [dev-dependencies]
 ctor = "0.1"
-big-o = "0.2"
+big-o-test = "0.2"
 ````
 
 Then create an Integration Test, setting it up to execute tests linearly -- see `tests/std_containers.rs` for an example

@@ -1,5 +1,5 @@
 [package]
-name          = "big-o"
+name          = "big-o-test"
 version       = "0.2.1"
 edition       = "2021"
 description   = "(native) Types & operations to allow space efficient storage of dates and times"
@@ -9,7 +9,7 @@ readme        = "README.md"
 authors       = ["Luiz Silveira <zertyz@gmail.com>"]
 homepage      = "https://github.com/zertyz/big-o"
 repository    = "https://github.com/zertyz/big-o"
-documentation = "https://docs.rs/big-o/"
+documentation = "https://docs.rs/big-o-test/"
 license       = "Unlicense"
 
 
