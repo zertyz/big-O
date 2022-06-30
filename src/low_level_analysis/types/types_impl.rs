@@ -49,19 +49,50 @@ impl<T: BigOAlgorithmMeasurements> Display for BigOAlgorithmAnalysis<T> {
 }
 
 
-impl<'a,ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for ConstantSetAlgorithmMeasurements<'a,ScalarTimeUnit> {
+impl<'a, ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for AlgorithmMeasurements<'a, ScalarTimeUnit> {
     fn space_measurements(&self) -> &BigOSpaceMeasurements {
         &self.space_measurements
     }
 }
-impl<'a,ScalarTimeUnit: Copy> Display for ConstantSetAlgorithmMeasurements<'a,ScalarTimeUnit> {
+impl<'a, ScalarTimeUnit: Copy> Display for AlgorithmMeasurements<'a, ScalarTimeUnit> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // placing those in string variables since {:>12} seem not to work on implementers of Display
         let pass_1_time  = format!("{}", self.time_measurements.pass_1_measurements);
         let pass_2_time  = format!("{}", self.time_measurements.pass_2_measurements);
         let pass_1_space = format!("{}", self.space_measurements.pass_1_measurements);
         let pass_2_space = format!("{}", self.space_measurements.pass_2_measurements);
-        write!(f, "'{}' constant set algorithm measurements:\n\
+        let pass_1_space_per_n = format!("{}", self.space_measurements.pass_1_measurements.fmt_over_n(self.passes_info.pass1_n));
+        let pass_2_space_per_n = format!("{}", self.space_measurements.pass_2_measurements.fmt_over_n(self.passes_info.pass2_n));
+        write!(f, "'{}' regular-algorithm measurements:\n\
+                   pass          Δt              Δs             n            s⁻           t⁻\n\
+                   1) {:>13}  {:>14}  {:>12}  {:>12}  {:>12.3}{}\n\
+                   2) {:>13}  {:>14}  {:>12}  {:>12}  {:>12.3}{}\n",
+
+               self.measurement_name,
+
+               pass_1_time, pass_1_space, self.passes_info.pass1_n,
+               pass_1_space_per_n,
+               self.time_measurements.pass_1_measurements.elapsed_time as f64 / self.passes_info.pass1_n as f64, self.time_measurements.pass_1_measurements.time_unit.unit_str,
+
+               pass_2_time, pass_2_space, self.passes_info.pass2_n,
+               pass_2_space_per_n,
+               self.time_measurements.pass_2_measurements.elapsed_time as f64 / self.passes_info.pass2_n as f64, self.time_measurements.pass_2_measurements.time_unit.unit_str
+        )
+    }
+}
+
+
+impl<'a, ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for ConstantSetIteratorAlgorithmMeasurements<'a, ScalarTimeUnit> {
+    fn space_measurements(&self) -> &BigOSpaceMeasurements {
+        &self.space_measurements
+    }
+}
+impl<'a, ScalarTimeUnit: Copy> Display for ConstantSetIteratorAlgorithmMeasurements<'a, ScalarTimeUnit> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let pass_1_time  = format!("{}", self.time_measurements.pass_1_measurements);
+        let pass_2_time  = format!("{}", self.time_measurements.pass_2_measurements);
+        let pass_1_space = format!("{}", self.space_measurements.pass_1_measurements);
+        let pass_2_space = format!("{}", self.space_measurements.pass_2_measurements);
+        write!(f, "'{}' constant set iterator-algorithm measurements:\n\
                    pass          Δt              Δs            Σn            ⊆r            t⁻\n\
                    1) {:>13}  {:>14}  {:>12}  {:>12}  {:>12.3}{}\n\
                    2) {:>13}  {:>14}  {:>12}  {:>12}  {:>12.3}{}\n",
@@ -78,19 +109,18 @@ impl<'a,ScalarTimeUnit: Copy> Display for ConstantSetAlgorithmMeasurements<'a,Sc
 }
 
 
-impl<'a,ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for SetResizingAlgorithmMeasurements<'a,ScalarTimeUnit> {
+impl<'a,ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for SetResizingIteratorAlgorithmMeasurements<'a,ScalarTimeUnit> {
     fn space_measurements(&self) -> &BigOSpaceMeasurements {
         &self.space_measurements
     }
 }
-impl<'a,ScalarTimeUnit: Copy> Display for SetResizingAlgorithmMeasurements<'a,ScalarTimeUnit> {
+impl<'a,ScalarTimeUnit: Copy> Display for SetResizingIteratorAlgorithmMeasurements<'a,ScalarTimeUnit> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // placing those in string variables since {:>12} seem not to work on implementers of Display
         let pass_1_time  = format!("{}", self.time_measurements.pass_1_measurements);
         let pass_2_time  = format!("{}", self.time_measurements.pass_2_measurements);
         let pass_1_space = format!("{}", self.space_measurements.pass_1_measurements);
         let pass_2_space = format!("{}", self.space_measurements.pass_2_measurements);
-        write!(f, "'{}' set resizing algorithm measurements:\n\
+        write!(f, "'{}' set resizing iterator-algorithm measurements:\n\
                    pass          Δt              Δs            Σn            t⁻\n\
                    1) {:>13}  {:>14}  {:>12}  {:>12.3}{}\n\
                    2) {:>13}  {:>14}  {:>12}  {:>12.3}{}\n",
@@ -146,16 +176,32 @@ impl Display for BigOSpaceMeasurements {
 }
 
 
-impl Display for BigOSpacePassMeasurements {
-    // shows a summary -- just the used or freed memory, with b, KiB, MiB or GiB unit suffixes
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let used_memory = self.used_memory_after as f32 - self.used_memory_before as f32;
+impl BigOSpacePassMeasurements {
+    /// Presents either the used or freed memory, with b, KiB, MiB or GiB unit suffixes -- and with the optional `-`, `+` or a null prefix:
+    ///  * `-` denotes RAM was freed instead of allocated
+    ///  * `+` means RAM was allocated (and remained so)
+    ///  * a null prefix indicates RAM was allocated, but got freed -- so no extra RAM is being used.
+    ///
+    /// When `n` is 1.0, shows the absolute RAM usage;
+    /// otherwise, `n` should be the number of elements and the output will represent the memory usage per element
+    pub fn fmt_over_n(&self, n: u32) -> String {
+        let used_memory = (self.used_memory_after as f32 - self.used_memory_before as f32) / n as f32;
         let sign = if used_memory > 0.0 {"+"} else if used_memory < 0.0 {"-"} else {""};
         let used_memory = std::cmp::max( self.max_used_memory    - self.used_memory_before,
-                                         self.used_memory_before - self.min_used_memory ) as f32;
+                                              self.used_memory_before - self.min_used_memory ) as f32 / n as f32;
         let memory_unit = if used_memory.abs() > (1<<30) as f32 {"GiB"}                        else if used_memory.abs() > (1<<20) as f32 {"MiB"}                              else if used_memory.abs() > (1<<10) as f32 {"KiB"}                              else {"b"};
         let memory_delta = if used_memory.abs() > (1<<30) as f32 {used_memory / (1<<30) as f32} else if used_memory.abs() > (1<<20) as f32 {used_memory.abs() / (1<<20) as f32} else if used_memory.abs() > (1<<10) as f32 {used_memory.abs() / (1<<10) as f32} else {used_memory.abs()};
-        write!(f, "{}{:.2}{}", sign, memory_delta, memory_unit)
+        // emit the dot or not
+        if (memory_delta.round()-memory_delta).abs() < 1e-3 && memory_unit == "b" {
+            format!("{}{:.0}{}", sign, memory_delta, memory_unit)
+        } else {
+            format!("{}{:.2}{}", sign, memory_delta, memory_unit)
+        }
+    }
+}
+impl Display for BigOSpacePassMeasurements {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.fmt_over_n(1))
     }
 }
 impl Default for BigOSpacePassMeasurements {
@@ -168,12 +214,6 @@ impl Default for BigOSpacePassMeasurements {
         }
     }
 }
-
-
-impl AlgorithmPassesInfo for ConstantSetAlgorithmPassesInfo {}
-
-
-impl AlgorithmPassesInfo for SetResizingAlgorithmPassesInfo {}
 
 
 impl<T> Default for TimeUnit<T> {
@@ -195,8 +235,8 @@ mod tests {
             types::{
                 BigOAlgorithmComplexity, BigOAlgorithmAnalysis,
                 BigOTimeMeasurements, BigOSpaceMeasurements,
-                ConstantSetAlgorithmPassesInfo, SetResizingAlgorithmPassesInfo,
-                ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
+                ConstantSetIteratorAlgorithmPassesInfo, SetResizingIteratorAlgorithmPassesInfo,
+                ConstantSetIteratorAlgorithmMeasurements, SetResizingIteratorAlgorithmMeasurements,
                 TimeUnit, TimeUnits
             },
             time_analysis::*,

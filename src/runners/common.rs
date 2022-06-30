@@ -2,10 +2,7 @@
 
 use crate::{
     configs,
-    low_level_analysis::{
-        BigOAlgorithmType,
-        types::*,
-    },
+    low_level_analysis::types::*,
 };
 use std::{
     ops::Range,
@@ -19,7 +16,7 @@ pub fn run_iterator_pass_verbosely<'a, _IteratorAlgorithmClosure: Fn(u32) -> u32
                                        T: TryInto<u64> + Copy> (result_prefix:      &str,
                                                                 result_suffix:      &str,
                                                                 iterator_algorithm: &_IteratorAlgorithmClosure,
-                                                                algorithm_type:     &BigOAlgorithmType,
+                                                                algorithm_type:     &BigOIteratorAlgorithmType,
                                                                 range:              Range<u32>,
                                                                 time_unit:          &'a TimeUnit<T>,
                                                                 threads:            u32,
@@ -57,24 +54,24 @@ pub fn run_pass_verbosely<'a, _OutputClosure:    FnMut(&str),
 /// returns: tuple with ([PassResult], computed_number: u32)
 pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync,
                                     _ScalarDuration:   TryInto<u64> + Copy> (iterator_algorithm: &_AlgorithmClosure,
-                                                                             algorithm_type:     &BigOAlgorithmType,
+                                                                             algorithm_type:     &BigOIteratorAlgorithmType,
                                                                              range:              Range<u32>,
                                                                              time_unit:          &'a TimeUnit<_ScalarDuration>,
                                                                              threads:            u32)
-                                                                            -> (PassResult<'a,_ScalarDuration>, u32) {
+                                                                             -> (PassResult<'a,_ScalarDuration>, u32) {
 
     type ThreadLoopResult = (Duration, u32);
 
     fn thread_loop<_AlgorithmClosure: Fn(u32) -> u32 + Sync>
-                  (iterator_algorithm: &_AlgorithmClosure, algorithm_type: &BigOAlgorithmType, range: Range<u32>)
-                  -> ThreadLoopResult {
+                  (iterator_algorithm: &_AlgorithmClosure, algorithm_type: &BigOIteratorAlgorithmType, range: Range<u32>)
+                   -> ThreadLoopResult {
         let mut thread_r: u32 = range.end;
 
         let thread_start = SystemTime::now();
 
         // run 'algorithm()' allowing normal or reversed order
         match algorithm_type {
-            BigOAlgorithmType::ConstantSet => {
+            BigOIteratorAlgorithmType::ConstantSet => {
                 if range.end < range.start {
                     for e in (range.end..range.start).rev() {
                         thread_r ^= iterator_algorithm(e);
@@ -85,7 +82,7 @@ pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync,
                     }
                 }
             },
-            BigOAlgorithmType::SetResizing => {
+            BigOIteratorAlgorithmType::SetResizing => {
                 if range.end < range.start {
                     for e in (range.end..range.start).rev() {
                         thread_r ^= iterator_algorithm(e);

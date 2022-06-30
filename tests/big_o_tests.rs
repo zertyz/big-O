@@ -26,20 +26,34 @@ fn setup_env() {
 
 #[test]
 fn quick_sort_reversed_vec() {
-    let mut vec1: Vec<u32> = (0..10000000).rev().collect();
-    let mut vec2: Vec<u32> = (0..20000000).rev().collect();
-    test_constant_set_algorithm(
+    const VEC1_LEN: u32 = 40000000;
+    const VEC2_LEN: u32 = 80000000;
+    let vec1 = parking_lot::RwLock::new(Vec::<u32>::new());
+    let vec2 = parking_lot::RwLock::new(Vec::<u32>::new());
+    test_algorithm(
         "Quicksort a reversed vec", 15,
-        vec1.len() as u32, || {
+        || {
+            let mut vec1 = vec1.write();
+            for i in 0..VEC1_LEN {
+                vec1.push(i);
+            }
+            let mut vec2 = vec2.write();
+            for i in 0..VEC2_LEN {
+                vec2.push(i);
+            }
+        },
+        VEC1_LEN, || {
+            let mut vec1 = vec1.write();
             vec1.sort();
             vec1[12]
         },
-        vec2.len() as u32, || {
+        VEC2_LEN, || {
+            let mut vec2 = vec2.write();
             vec2.sort();
             vec2[14]
         },
         BigOAlgorithmComplexity::ON, BigOAlgorithmComplexity::ON,
-        &TimeUnits::MICROSECOND, || ()
+        &TimeUnits::MICROSECOND
     )
 }
 

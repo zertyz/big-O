@@ -9,91 +9,70 @@
 //!
 
 use crate::low_level_analysis::{
+    analyze_complexity,
+    analyze_set_resizing_iterator_complexity,
     types::*,
     configs::*,
 };
 
-/// Perform space complexity analysis for algorithms that do not alter the set size they operate on.
+
+/// Performs space complexity analysis for regular, non-iterator algorithms, such as `fib(n)`, `sort(n)`, `bsearch(e, n)`, ...
+pub fn analyse_space_complexity(passes_info:  &AlgorithmPassesInfo,
+                                measurements: &BigOSpaceMeasurements) -> BigOAlgorithmComplexity {
+
+    // max mem usage
+    let s1 = (measurements.pass_1_measurements.max_used_memory - measurements.pass_1_measurements.used_memory_before) as f64;
+    let s2 = (measurements.pass_2_measurements.max_used_memory - measurements.pass_2_measurements.used_memory_before) as f64;
+
+    // set sizes
+    let n1 = passes_info.pass1_n as f64;
+    let n2 = passes_info.pass2_n as f64;
+
+    analyze_complexity(s1, s2, n1, n2)
+}
+
+/// Perform space complexity analysis for iterator algorithms that do not alter the size of the set they operate on or for
+/// non-iterator algorithms (even if they are growing/shrinking a data set from top to zero),
+/// where iterator algorithms are the ones that operates on a single element (of a huge set) per call.\
 /// Examples: fib(n), sort(n), bsearch, read, update
-///   - O(1) for functions that do not use ram at all (or that use a const amount, regardles of the set size), like uncached reads / updates
+///   - O(1) for functions that do not use ram at all (or that use a const amount, regardless of the set size), like uncached reads / updates
 ///   - O(log(n)) for recursive binary searches and the like
 ///   - O(n) if caching takes place for reads / updates
-pub fn analyse_space_complexity_for_constant_set_algorithm(passes_info:  &ConstantSetAlgorithmPassesInfo,
-                                                           measurements: &BigOSpaceMeasurements) -> BigOAlgorithmComplexity {
+/// See [analyse_space_complexity_for_set_resizing_iterator_algorithm()] for iterator algorithms that resize the data set they operate on.
+pub fn analyse_space_complexity_for_constant_set_iterator_algorithm(passes_info:  &ConstantSetIteratorAlgorithmPassesInfo,
+                                                                    measurements: &BigOSpaceMeasurements) -> BigOAlgorithmComplexity {
 
-    // max mem used
-    let s1 = measurements.pass_1_measurements.max_used_memory as f64 - measurements.pass_1_measurements.used_memory_before as f64;
-    let s2 = measurements.pass_2_measurements.max_used_memory as f64 - measurements.pass_2_measurements.used_memory_before as f64;
+    // max mem usage
+    let s1 = (measurements.pass_1_measurements.max_used_memory - measurements.pass_1_measurements.used_memory_before) as f64;
+    let s2 = (measurements.pass_2_measurements.max_used_memory - measurements.pass_2_measurements.used_memory_before) as f64;
 
-    // set size variation
+    // set sizes
     let n1 = std::cmp::min(passes_info.pass_1_set_size, passes_info.pass_2_set_size) as f64;
     let n2 = std::cmp::max(passes_info.pass_1_set_size, passes_info.pass_2_set_size) as f64;
 
-    let time_complexity: BigOAlgorithmComplexity;
-
-    if ((s1 / s2) - 1.0_f64) > PERCENT_TOLERANCE {
-        // sanity check
-        time_complexity = BigOAlgorithmComplexity::BetterThanO1;
-    } else if ((s2 / s1) - 1.0_f64).abs() <= PERCENT_TOLERANCE {
-        // check for O(1) -- t2/t1 ~= 1
-        time_complexity = BigOAlgorithmComplexity::O1;
-    } else if ( ((s2 / s1) / ( n2.log2() / n1.log2() )) - 1.0_f64 ).abs() <= PERCENT_TOLERANCE {
-        // check for O(log(n)) -- (t2/t1) / (log(n2)/log(n1)) ~= 1
-        time_complexity = BigOAlgorithmComplexity::OLogN;
-    } else if ( ((s2 / s1) / (n2 / n1)) - 1.0_f64 ).abs() <= PERCENT_TOLERANCE {
-        // check for O(n) -- (t2/t1) / (n2/n1) ~= 1
-        time_complexity = BigOAlgorithmComplexity::ON;
-    } else if ( ((s2 / s1) / (n2 / n1)) - 1.0_f64 ) > PERCENT_TOLERANCE {
-        // check for worse than O(n)
-        time_complexity = BigOAlgorithmComplexity::WorseThanON;
-    } else {
-        // by exclusion...
-        time_complexity = BigOAlgorithmComplexity::BetweenOLogNAndON;
-    }
-
-    time_complexity
+    analyze_complexity(s1, s2, n1, n2)
 }
 
-/// Perform space complexity analysis for algorithms that alter the set size they operate on.
+/// Perform space complexity analysis for iterator algorithms that alter the set size they operate on,
+/// where iterator algorithms are the ones that adds/consumes one element (to/from a huge set) per call.\
 /// Examples: insert/delete, enqueue/dequeue, push/pop
-///   - O(1) will be returned for insertions that allocate 1 constant slot size for each element;
+///   - O(1) will be returned for insertions that allocate a constant slot size for each element, regardless of the number of elements;
 ///   - If some filtering is done at insertion time (like in an UpSert or upon inserting only even elements), than Better than O(1) may be returned;
 ///   - O(log(n)), being worse than O(1), requires that an additional allocation to be done every now and then... like when building a sortable/searchable
 ///     binary tree for the vector elements -- to allow fast searches while keeping the traversal order (to match insertion order)
 ///   - O(n) for wired algorithms where each new inserted (n+1) element cause another (n) or even (n+1) elements to be insert as well.
 ///     Example: increment by 1 both chess board dimensions. board(n) will become board(n+1): 1+2*n elements are added. O(n) memory consumption.
-pub fn analyse_space_complexity_for_set_resizing_algorithm(passes_info:  &SetResizingAlgorithmPassesInfo,
-                                                           measurements: &BigOSpaceMeasurements) -> BigOAlgorithmComplexity {
+/// See [analyse_space_complexity_for_constant_set_iterator_algorithm()] for non-iterator algorithms and for iterator algorithms that operate on a constant set.
+pub fn analyse_space_complexity_for_set_resizing_iterator_algorithm(passes_info:  &SetResizingIteratorAlgorithmPassesInfo,
+                                                                    measurements: &BigOSpaceMeasurements) -> BigOAlgorithmComplexity {
 
     let n = passes_info.delta_set_size as f64;
 
     // max mem used
-    let s1 = (measurements.pass_1_measurements.max_used_memory as f64 - measurements.pass_1_measurements.used_memory_before as f64) / n;
-    let s2 = (measurements.pass_2_measurements.max_used_memory as f64 - measurements.pass_2_measurements.used_memory_before as f64) / n;
+    let s1 = (measurements.pass_1_measurements.max_used_memory - measurements.pass_1_measurements.used_memory_before) as f64;
+    let s2 = (measurements.pass_2_measurements.max_used_memory - measurements.pass_2_measurements.used_memory_before) as f64;
 
-    let time_complexity: BigOAlgorithmComplexity;
-
-    if ((s1 / s2) - 1.0_f64) > PERCENT_TOLERANCE {
-        // sanity check
-        time_complexity = BigOAlgorithmComplexity::BetterThanO1;
-    } else if ((s2 / s1) - 1.0_f64).abs() <= PERCENT_TOLERANCE {
-        // check for O(1) -- t2/t1 ~= 1
-        time_complexity = BigOAlgorithmComplexity::O1;
-    } else if ( ((s2 / s1) / ( (n * 3.0_f64).log2() / n.log2() )) - 1.0_f64 ).abs() < PERCENT_TOLERANCE {
-        // check for O(log(n)) -- (t2/t1) / (log(n*3)/log(n)) ~= 1
-        time_complexity = BigOAlgorithmComplexity::OLogN;
-    } else if ( ((s2 / s1) / 3.0_f64) - 1.0_f64 ).abs() <= PERCENT_TOLERANCE {
-        // check for O(n) -- (t2/t1) / 3 ~= 1
-        time_complexity = BigOAlgorithmComplexity::ON;
-    } else if ( ((s2 / s1) / 3.0_f64) - 1.0_f64 ) > PERCENT_TOLERANCE {
-        // check for worse than O(n)
-        time_complexity = BigOAlgorithmComplexity::WorseThanON;
-    } else {
-        // by exclusion...
-        time_complexity = BigOAlgorithmComplexity::BetweenOLogNAndON;
-    }
-
-    time_complexity
+    analyze_set_resizing_iterator_complexity(s1, s2, n)
 }
 
 #[cfg(any(test, feature="dox"))]
@@ -110,13 +89,13 @@ mod tests {
     #[serial]
     fn analyse_constant_set_algorithm_theoretical_test() {
 
-        let assert = |measurement_name, expected_complexity, passes_info: ConstantSetAlgorithmPassesInfo, space_measurements: BigOSpaceMeasurements| {
-            let observed_time_complexity = analyse_space_complexity_for_constant_set_algorithm(&passes_info, &space_measurements);
+        let assert = |measurement_name, expected_complexity, passes_info: ConstantSetIteratorAlgorithmPassesInfo, space_measurements: BigOSpaceMeasurements| {
+            let observed_time_complexity = analyse_space_complexity_for_constant_set_iterator_algorithm(&passes_info, &space_measurements);
             assert_eq!(observed_time_complexity, expected_complexity, "Algorithm Analysis on CONSTANT SET algorithm for '{}' check failed!", measurement_name);
         };
 
         assert("Theoretical better than O(1) Update/Select", BigOAlgorithmComplexity::BetterThanO1,
-               ConstantSetAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2000, repetitions: 1000 },
+               ConstantSetIteratorAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2000, repetitions: 1000 },
                BigOSpaceMeasurements {
                    pass_1_measurements: BigOSpacePassMeasurements {
                        used_memory_before: 0,
@@ -133,7 +112,7 @@ mod tests {
                });
 
         assert("Theoretical O(1) Update/Select", BigOAlgorithmComplexity::O1,
-               ConstantSetAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2000, repetitions: 1000 },
+               ConstantSetIteratorAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2000, repetitions: 1000 },
                BigOSpaceMeasurements {
                    pass_1_measurements: BigOSpacePassMeasurements {
                        used_memory_before: 0,
@@ -150,7 +129,7 @@ mod tests {
                });
 
         assert("Theoretical O(log(n)) Update/Select", BigOAlgorithmComplexity::OLogN,
-               ConstantSetAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2000, repetitions: 1000 },
+               ConstantSetIteratorAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2000, repetitions: 1000 },
                BigOSpaceMeasurements {
                    pass_1_measurements: BigOSpacePassMeasurements {
                        used_memory_before: 0,
@@ -167,7 +146,7 @@ mod tests {
                });
 
         assert("Theoretical between O(log(n)) and O(n) Update/Select", BigOAlgorithmComplexity::BetweenOLogNAndON,
-               ConstantSetAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2500, repetitions: 1000 },
+               ConstantSetIteratorAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2500, repetitions: 1000 },
                BigOSpaceMeasurements {
                    pass_1_measurements: BigOSpacePassMeasurements {
                        used_memory_before: 0,
@@ -184,7 +163,7 @@ mod tests {
                });
 
         assert("Theoretical O(n) Update/Select", BigOAlgorithmComplexity::ON,
-               ConstantSetAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2000, repetitions: 1000 },
+               ConstantSetIteratorAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2000, repetitions: 1000 },
                BigOSpaceMeasurements {
                    pass_1_measurements: BigOSpacePassMeasurements {
                        used_memory_before: 0,
@@ -201,7 +180,7 @@ mod tests {
                });
 
         assert("Theoretical worse than O(n) Update/Select", BigOAlgorithmComplexity::WorseThanON,
-               ConstantSetAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2000, repetitions: 1000 },
+               ConstantSetIteratorAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2000, repetitions: 1000 },
                BigOSpaceMeasurements {
                    pass_1_measurements: BigOSpacePassMeasurements {
                        used_memory_before: 0,
@@ -224,8 +203,8 @@ mod tests {
     #[serial]
     fn analyse_set_resizing_algorithm_theoretical_test() {
 
-        let assert = |measurement_name, expected_complexity, passes_info: SetResizingAlgorithmPassesInfo, space_measurements: BigOSpaceMeasurements| {
-            let observed_complexity = analyse_space_complexity_for_set_resizing_algorithm(&passes_info, &space_measurements);
+        let assert = |measurement_name, expected_complexity, passes_info: SetResizingIteratorAlgorithmPassesInfo, space_measurements: BigOSpaceMeasurements| {
+            let observed_complexity = analyse_space_complexity_for_set_resizing_iterator_algorithm(&passes_info, &space_measurements);
             assert_eq!(observed_complexity, expected_complexity, "Algorithm Analysis on SET RESIZING algorithm for '{}' check failed!", measurement_name);
         };
 
@@ -238,7 +217,7 @@ mod tests {
         }).round() as usize;
 
         assert("Theoretical better than O(1) Insert/Delete", BigOAlgorithmComplexity::BetterThanO1,
-               SetResizingAlgorithmPassesInfo { delta_set_size: 1000 },
+               SetResizingIteratorAlgorithmPassesInfo { delta_set_size: 1000 },
                BigOSpaceMeasurements {
                    pass_1_measurements: BigOSpacePassMeasurements {
                        used_memory_before: 0,
@@ -255,7 +234,7 @@ mod tests {
                });
 
         assert("Theoretical O(1) Insert/Delete", BigOAlgorithmComplexity::O1,
-               SetResizingAlgorithmPassesInfo { delta_set_size: 1000 },
+               SetResizingIteratorAlgorithmPassesInfo { delta_set_size: 1000 },
                BigOSpaceMeasurements {
                    pass_1_measurements: BigOSpacePassMeasurements {
                        used_memory_before: 0,
@@ -272,7 +251,7 @@ mod tests {
                });
 
         assert("Theoretical O(log(n)) Insert/Delete", BigOAlgorithmComplexity::OLogN,
-               SetResizingAlgorithmPassesInfo { delta_set_size: 1000 },
+               SetResizingIteratorAlgorithmPassesInfo { delta_set_size: 1000 },
                BigOSpaceMeasurements {
                    pass_1_measurements: BigOSpacePassMeasurements {
                        used_memory_before: 0,
@@ -289,7 +268,7 @@ mod tests {
                });
 
         assert("Theoretical between O(log(n)) and O(n) Insert/Delete", BigOAlgorithmComplexity::BetweenOLogNAndON,
-               SetResizingAlgorithmPassesInfo { delta_set_size: 1000 },
+               SetResizingIteratorAlgorithmPassesInfo { delta_set_size: 1000 },
                BigOSpaceMeasurements {
                    pass_1_measurements: BigOSpacePassMeasurements {
                        used_memory_before: 0,
@@ -306,7 +285,7 @@ mod tests {
                });
 
         assert("Theoretical O(n) Insert/Delete", BigOAlgorithmComplexity::ON,
-               SetResizingAlgorithmPassesInfo { delta_set_size: 1000 },
+               SetResizingIteratorAlgorithmPassesInfo { delta_set_size: 1000 },
                BigOSpaceMeasurements {
                    pass_1_measurements: BigOSpacePassMeasurements {
                        used_memory_before: 0,
@@ -323,7 +302,7 @@ mod tests {
                });
 
         assert("Theoretical worse than O(n) Insert/Delete", BigOAlgorithmComplexity::WorseThanON,
-               SetResizingAlgorithmPassesInfo { delta_set_size: 1000 },
+               SetResizingIteratorAlgorithmPassesInfo { delta_set_size: 1000 },
                BigOSpaceMeasurements {
                    pass_1_measurements: BigOSpacePassMeasurements {
                        used_memory_before: 0,
@@ -348,8 +327,8 @@ mod tests {
         // constant_set
         let mut last_complexity = BigOAlgorithmComplexity::BetterThanO1;
         for pass_2_used_memory in 0..500 {
-            let current_complexity = analyse_space_complexity_for_constant_set_algorithm(
-                &ConstantSetAlgorithmPassesInfo {
+            let current_complexity = analyse_space_complexity_for_constant_set_iterator_algorithm(
+                &ConstantSetIteratorAlgorithmPassesInfo {
                     pass_1_set_size: 1000,
                     pass_2_set_size: 2000,
                     repetitions: 1000
@@ -379,8 +358,8 @@ mod tests {
         // set_resizing
         let mut last_complexity = BigOAlgorithmComplexity::BetterThanO1;
         for pass_2_used_memory in 0..500 {
-            let current_complexity = analyse_space_complexity_for_set_resizing_algorithm(
-                &SetResizingAlgorithmPassesInfo { delta_set_size: 1000 },
+            let current_complexity = analyse_space_complexity_for_set_resizing_iterator_algorithm(
+                &SetResizingIteratorAlgorithmPassesInfo { delta_set_size: 1000 },
                 &BigOSpaceMeasurements {
                     pass_1_measurements: BigOSpacePassMeasurements {
                         used_memory_before: 0,

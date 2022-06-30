@@ -18,6 +18,23 @@ pub enum BigOAlgorithmComplexity {
     WorseThanON,
 }
 
+/// Specifies if the iterator algorithm under analysis alters the data set it works on or if it has no side-effects on it.\
+/// Different math applies on each case, as well as different parameters to the iterator function required by the [crate::runner].
+/// The "Iterator Algorithms" term is used in this crate to distinguish them from "Standard Algorithms". They differ in the sense
+/// that Iterator Algorithms operate on a single element at a time (from a rather huge set) -- and, as said, different math applies
+/// to infer, at runtime, their complexity, depending on if they alter the set size or not;
+/// on the other hand, "Standard Algorithms" don't need that distinction: they may either build or consult a data set (provided the
+/// set is build/consumed from the ground up) and their runtime math is the same as for the "Constant Set Iterator Algorithms".
+#[derive(Debug)]
+pub enum BigOIteratorAlgorithmType {
+    /// the iterator algorithm under analysis change the data set size it operates on. Examples: insert/delete, enqueue/dequeue, ...\
+    /// See [math::set_resizing_iterator_algorithm_analysis()]
+    SetResizing,
+    /// the algorithm under analysis doesn't change the data set size it operates on. Examples: queries, sort, fib, ...\
+    /// See [math::constant_set_iterator_algorithm_analysis()]
+    ConstantSet,
+}
+
 /// base trait for [SetResizingAlgorithmMeasurements] & [ConstantSetAlgorithmMeasurements], made public
 /// to attend to rustc's rules. Most probably this trait is of no use outside it's own module.
 pub trait BigOAlgorithmMeasurements: Display {
@@ -32,40 +49,51 @@ pub struct BigOAlgorithmAnalysis<T: BigOAlgorithmMeasurements> {
     pub algorithm_measurements:  T,
 }
 
-/// Type for [BigOAlgorithmAnalysis::algorithm_measurements] when analyzing algorithms
-/// that do not change the set size they operate on -- select/update, get, sort, fib, ...
-/// See also [SetResizingAlgorithmMeasurements]
-pub struct ConstantSetAlgorithmMeasurements<'a,ScalarTimeUnit: Copy> {
+/// Type for [BigOAlgorithmAnalysis::algorithm_measurements] when analyzing regular algorithms
+/// (non-iterator algorithms) -- such as sort, fib, ...
+pub struct AlgorithmMeasurements<'a, ScalarTimeUnit: Copy> {
     /// a name for these measurements, for presentation purposes
     pub measurement_name:   &'a str,
     /// each pass info for use in the time & space complexity analysis
-    pub passes_info:        ConstantSetAlgorithmPassesInfo,
-    pub time_measurements:  BigOTimeMeasurements<'a,ScalarTimeUnit>,
+    pub passes_info:        AlgorithmPassesInfo,
+    pub time_measurements:  BigOTimeMeasurements<'a, ScalarTimeUnit>,
     pub space_measurements: BigOSpaceMeasurements,
 }
 
-/// Type for [BigOAlgorithmAnalysis::algorithm_measurements] when analyzing algorithms
+/// Type for [BigOAlgorithmAnalysis::algorithm_measurements] when analyzing iterator algorithms
+/// that do not change the set size they operate on -- select/update, get, ...
+/// See also [SetResizingAlgorithmMeasurements]
+pub struct ConstantSetIteratorAlgorithmMeasurements<'a, ScalarTimeUnit: Copy> {
+    /// a name for these measurements, for presentation purposes
+    pub measurement_name:   &'a str,
+    /// each pass info for use in the time & space complexity analysis
+    pub passes_info:        ConstantSetIteratorAlgorithmPassesInfo,
+    pub time_measurements:  BigOTimeMeasurements<'a, ScalarTimeUnit>,
+    pub space_measurements: BigOSpaceMeasurements,
+}
+
+/// Type for [BigOAlgorithmAnalysis::algorithm_measurements] when analyzing iterator algorithms
 /// that change the set size they operate on -- insert/delete, enqueue/dequeue, push/pop, add/remove, ...
 /// See also [ConstantSetAlgorithmMeasurements]
-pub struct SetResizingAlgorithmMeasurements<'a,ScalarTimeUnit: Copy> {
+pub struct SetResizingIteratorAlgorithmMeasurements<'a, ScalarTimeUnit: Copy> {
     /// a name for these measurements, for presentation purposes
     pub measurement_name: &'a str,
     /// each pass info for use in the time & space complexity analysis
-    pub passes_info:        SetResizingAlgorithmPassesInfo,
-    pub time_measurements:  BigOTimeMeasurements<'a,ScalarTimeUnit>,
+    pub passes_info:        SetResizingIteratorAlgorithmPassesInfo,
+    pub time_measurements:  BigOTimeMeasurements<'a, ScalarTimeUnit>,
     pub space_measurements: BigOSpaceMeasurements,
 }
 
 /// represents an algorithm's run-time time measurements for passes 1 & 2, so that it can have it's time complexity analyzed
-pub struct BigOTimeMeasurements<'a,ScalarTimeUnit: Copy> {
-    pub pass_1_measurements: BigOTimePassMeasurements<'a,ScalarTimeUnit>,
-    pub pass_2_measurements: BigOTimePassMeasurements<'a,ScalarTimeUnit>,
+pub struct BigOTimeMeasurements<'a, ScalarTimeUnit: Copy> {
+    pub pass_1_measurements: BigOTimePassMeasurements<'a, ScalarTimeUnit>,
+    pub pass_2_measurements: BigOTimePassMeasurements<'a ,ScalarTimeUnit>,
 }
 
 /// the elapsed time & unit taken to run one of the 2 passes for the algorithm time complexity analysis.
 /// Contained in [BigOTimeMeasurements].
 #[derive(Clone,Copy)]
-pub struct BigOTimePassMeasurements<'a,ScalarTimeUnit> where ScalarTimeUnit: Clone+Copy {
+pub struct BigOTimePassMeasurements<'a, ScalarTimeUnit> where ScalarTimeUnit: Clone+Copy {
     /// the time it took to run a pass
     pub elapsed_time: u64,
     /// unit for the measurements in this struct
@@ -92,27 +120,31 @@ pub struct BigOSpacePassMeasurements {
     pub min_used_memory:    usize,
 }
 
-/// base type for [ConstantSetAlgorithmPassesInfo] and [SetResizingAlgorithmPassesInfo]
-/// which contains the pass information for the Algorithm's space & time analysis for
-/// each type of algorithm
-pub trait AlgorithmPassesInfo {}
+/// Represents the "pass" information (info for the runner that measures time & space resource consumptions)
+/// for regular Algorithms which we want to perform the complexity analysis for.\
+/// Note that "Regular Algorithms" is in opposition to Iterator Algorithms
+pub struct AlgorithmPassesInfo {
+    /// elements processed on "pass 1"
+    pub pass1_n: u32,
+    /// elements pocessed on "pass 2"
+    pub pass2_n: u32,
+}
 
-/// Represents the pass information for Algorithms that don't alter the set size of the data they operate on
+/// Represents the pass information for Iterator Algorithms that don't alter the set size of the data they operate on
 /// (Selects / Updates / Sort / Fib...)
-#[derive(Clone,Copy)]
-pub struct ConstantSetAlgorithmPassesInfo {
+pub struct ConstantSetIteratorAlgorithmPassesInfo {
     /// set size when running "pass 1"
     pub pass_1_set_size: u32,
     /// set size when running "pass 2"
     pub pass_2_set_size: u32,
-    /// number of times the algorithm ran on each pass;
+    /// number of times the algorithm ran on each pass -- or, in other words, the "n" in the O(n) notation;
     /// each algorithm iteration should behave as executing on the same element without leaving side-effects
     pub repetitions: u32,
 }
 
-/// Represents the pass information for Algorithms that alters the set size of the data they operate on
+/// Represents the pass information for Iterator Algorithms that alter the set size of the data they operate on
 /// (Inserts / Deletes / Pushes / Pops / Enqueues / Dequeues...)
-pub struct SetResizingAlgorithmPassesInfo {
+pub struct SetResizingIteratorAlgorithmPassesInfo {
     /// number of elements added / removed on each pass;
     /// each algorithm iteration should either add or remove a single element
     /// and the test set must start or end with 0 elements

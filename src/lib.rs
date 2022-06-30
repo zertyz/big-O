@@ -14,7 +14,7 @@ pub use {
         TimeUnits,
     },
     runners::{
-        standard::test_constant_set_algorithm,
+        standard::{test_algorithm,test_constant_set_iterator_algorithm,test_set_resizing_iterator_algorithm},
         crud::test_crud_algorithms,
     },
 };

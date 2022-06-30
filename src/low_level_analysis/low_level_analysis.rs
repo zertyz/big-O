@@ -1,20 +1,61 @@
 //! See [super].
 
 use super::{
-    types::{TimeUnits, BigOTimePassMeasurements, BigOSpacePassMeasurements},
+    configs::PERCENT_TOLERANCE,
+    types::{BigOAlgorithmComplexity, BigOIteratorAlgorithmType, TimeUnits, BigOTimePassMeasurements, BigOSpacePassMeasurements},
 };
 
 use std::time::{Duration};
 
 
-#[derive(Debug)]
-/// Specifies if the algorithm under analysis alters the data set it works on or if it has no side-effects on it
-/// Different math applies on each case, as well as different parameters to the 'algorithm(u32) -> u32' function.
-pub enum BigOAlgorithmType {
-    /// the algorithm under analysis change the data set size it operates on. Examples: insert/delete, enqueue/dequeue, ...
-    SetResizing,
-    /// the algorithm under analysis doesn't change the data set size it operates on. Examples: queries, sort, fib, ...
-    ConstantSet,
+/// Performs the Algorithm Complexity Analysis on the resource denoted by `u`, where `u1` & `u2` are the resource
+/// utilization on passes 1 & 2 and, likewise, `n1` & `n2` represent the number of element, iterations or computations
+/// -- in other words, represents the `n` in the Big-O notation... `O(n)`, `O(log(n))`, `O(n²)`, etc...
+pub fn analyze_complexity(u1: f64, u2: f64, n1: f64, n2: f64) -> BigOAlgorithmComplexity {
+    if ((u1 / u2) - 1.0) > PERCENT_TOLERANCE {
+        // sanity check
+        BigOAlgorithmComplexity::BetterThanO1
+    } else if ((u2 / u1) - 1.0).abs() <= PERCENT_TOLERANCE {
+        // check for O(1) -- t2/t1 ~= 1
+        BigOAlgorithmComplexity::O1
+    } else if ( ((u2 / u1) / ( n2.log2() / n1.log2() )) - 1.0 ).abs() <= PERCENT_TOLERANCE {
+        // check for O(log(n)) -- (t2/t1) / (log(n2)/log(n1)) ~= 1
+        BigOAlgorithmComplexity::OLogN
+    } else if ( ((u2 / u1) / (n2 / n1)) - 1.0 ).abs() <= PERCENT_TOLERANCE {
+        // check for O(n) -- (t2/t1) / (n2/n1) ~= 1
+        BigOAlgorithmComplexity::ON
+    } else if ( ((u2 / u1) / (n2 / n1)) - 1.0 ) > PERCENT_TOLERANCE {
+        // check for worse than O(n)
+        BigOAlgorithmComplexity::WorseThanON
+    } else {
+        // by exclusion...
+        BigOAlgorithmComplexity::BetweenOLogNAndON
+    }
+}
+
+/// Performs the Algorithm Complexity Analysis on an iterator algorithm that alters the elements it operates on as it runs.\
+///   - `u1` & `u2` are the resource utilization on passes 1 & 2
+///   - `n` represent the number of element added or remove on each pass
+pub fn analyze_set_resizing_iterator_complexity(u1: f64, u2: f64, n: f64) -> BigOAlgorithmComplexity {
+    if ((u1 / u2) - 1.0) > PERCENT_TOLERANCE {
+        // sanity check
+        BigOAlgorithmComplexity::BetterThanO1
+    } else if ((u2 / u1) - 1.0).abs() <= PERCENT_TOLERANCE {
+        // check for O(1) -- t2/t1 ~= 1
+        BigOAlgorithmComplexity::O1
+    } else if ( ((u2 / u1) / ( (n * 3.0).log2() / n.log2() )) - 1.0 ).abs() < PERCENT_TOLERANCE {
+        // check for O(log(n)) -- (t2/t1) / (log(n*3)/log(n)) ~= 1
+        BigOAlgorithmComplexity::OLogN
+    } else if ( ((u2 / u1) / 3.0) - 1.0 ).abs() <= PERCENT_TOLERANCE {
+        // check for O(n) -- (t2/t1) / 3 ~= 1
+        BigOAlgorithmComplexity::ON
+    } else if ( ((u2 / u1) / 3.0) - 1.0 ) > PERCENT_TOLERANCE {
+        // check for worse than O(n)
+        BigOAlgorithmComplexity::WorseThanON
+    } else {
+        // by exclusion...
+        BigOAlgorithmComplexity::BetweenOLogNAndON
+    }
 }
 
 
@@ -31,8 +72,8 @@ mod tests {
             types::{
                 BigOAlgorithmComplexity, BigOAlgorithmAnalysis,
                 BigOTimeMeasurements, BigOSpaceMeasurements,
-                ConstantSetAlgorithmPassesInfo,   SetResizingAlgorithmPassesInfo,
-                ConstantSetAlgorithmMeasurements, SetResizingAlgorithmMeasurements,
+                ConstantSetIteratorAlgorithmPassesInfo, SetResizingIteratorAlgorithmPassesInfo,
+                ConstantSetIteratorAlgorithmMeasurements, SetResizingIteratorAlgorithmMeasurements,
                 TimeUnit, TimeUnits
             },
             time_analysis::*,
@@ -101,11 +142,11 @@ mod tests {
         let analyze = |measurement_name, select_function: fn(u32) -> u32| {
             OUTPUT(&format!("Real '{}', fetching {} elements on each pass ", measurement_name, REPETITIONS));
 
-            let (_warmup_result               , r1) = run_iterator_pass_verbosely("(warmup: ", "", &select_function, &BigOAlgorithmType::ConstantSet, 0 .. REPETITIONS, TIME_UNIT, 1, OUTPUT);
-            let (pass_1_result, r2) = run_iterator_pass_verbosely("; pass1: ", "", &select_function, &BigOAlgorithmType::ConstantSet, 0 .. PASS_1_SET_SIZE, TIME_UNIT, 1, OUTPUT);
-            let (pass_2_result, r3) = run_iterator_pass_verbosely("; pass2: ", "): ", &select_function, &BigOAlgorithmType::ConstantSet, PASS_2_SET_SIZE - REPETITIONS .. PASS_2_SET_SIZE, TIME_UNIT, 1, OUTPUT);
+            let (_warmup_result               , r1) = run_iterator_pass_verbosely("(warmup: ", "", &select_function, &BigOIteratorAlgorithmType::ConstantSet, 0 .. REPETITIONS, TIME_UNIT, 1, OUTPUT);
+            let (pass_1_result, r2) = run_iterator_pass_verbosely("; pass1: ", "", &select_function, &BigOIteratorAlgorithmType::ConstantSet, 0 .. PASS_1_SET_SIZE, TIME_UNIT, 1, OUTPUT);
+            let (pass_2_result, r3) = run_iterator_pass_verbosely("; pass2: ", "): ", &select_function, &BigOIteratorAlgorithmType::ConstantSet, PASS_2_SET_SIZE - REPETITIONS .. PASS_2_SET_SIZE, TIME_UNIT, 1, OUTPUT);
 
-            let constant_set_passes_info = ConstantSetAlgorithmPassesInfo {
+            let constant_set_passes_info = ConstantSetIteratorAlgorithmPassesInfo {
                 pass_1_set_size: PASS_1_SET_SIZE,
                 pass_2_set_size: PASS_2_SET_SIZE,
                 repetitions: REPETITIONS,
@@ -121,13 +162,13 @@ mod tests {
                 pass_2_measurements: pass_2_result.space_measurements,
             };
 
-            let time_complexity  = analyse_time_complexity_for_constant_set_algorithm(&constant_set_passes_info, &time_measurements);
-            let space_complexity = analyse_space_complexity_for_constant_set_algorithm(&constant_set_passes_info, &space_measurements);
+            let time_complexity  = analyse_time_complexity_for_constant_set_iterator_algorithm(&constant_set_passes_info, &time_measurements);
+            let space_complexity = analyse_space_complexity_for_constant_set_iterator_algorithm(&constant_set_passes_info, &space_measurements);
 
             let algorithm_analysis = BigOAlgorithmAnalysis {
                 time_complexity,
                 space_complexity,
-                algorithm_measurements: ConstantSetAlgorithmMeasurements {
+                algorithm_measurements: ConstantSetIteratorAlgorithmMeasurements {
                     measurement_name,
                     passes_info: constant_set_passes_info,
                     time_measurements,
@@ -200,12 +241,12 @@ mod tests {
             OUTPUT(&format!("Real '{}' with {} elements on each pass ", measurement_name, DELTA_SET_SIZE));
 
             /* warmup pass -- container / database should be reset before and after this */
-            let (_warmup_result,                r1) = run_iterator_pass_verbosely("(warmup: ", "", &insert_function, &BigOAlgorithmType::SetResizing, 0 .. DELTA_SET_SIZE, &TimeUnits::MICROSECOND, 1, OUTPUT);
+            let (_warmup_result,                r1) = run_iterator_pass_verbosely("(warmup: ", "", &insert_function, &BigOIteratorAlgorithmType::SetResizing, 0 .. DELTA_SET_SIZE, &TimeUnits::MICROSECOND, 1, OUTPUT);
             /* if we were operating on real data, we would reset the container / database after the warmup, before running pass 1 */
-            let (pass_1_result, r2) = run_iterator_pass_verbosely("; pass1: ", "", &insert_function, &BigOAlgorithmType::SetResizing, 0 ..DELTA_SET_SIZE, &TimeUnits::MICROSECOND, 1, OUTPUT);
-            let (pass_2_result, r3) = run_iterator_pass_verbosely("; pass2: ", "): ", &insert_function, &BigOAlgorithmType::SetResizing, DELTA_SET_SIZE.. DELTA_SET_SIZE * 2, &TimeUnits::MICROSECOND, 1, OUTPUT);
+            let (pass_1_result, r2) = run_iterator_pass_verbosely("; pass1: ", "", &insert_function, &BigOIteratorAlgorithmType::SetResizing, 0 ..DELTA_SET_SIZE, &TimeUnits::MICROSECOND, 1, OUTPUT);
+            let (pass_2_result, r3) = run_iterator_pass_verbosely("; pass2: ", "): ", &insert_function, &BigOIteratorAlgorithmType::SetResizing, DELTA_SET_SIZE.. DELTA_SET_SIZE * 2, &TimeUnits::MICROSECOND, 1, OUTPUT);
 
-            let set_resizing_passes_info = SetResizingAlgorithmPassesInfo { delta_set_size: DELTA_SET_SIZE };
+            let set_resizing_passes_info = SetResizingIteratorAlgorithmPassesInfo { delta_set_size: DELTA_SET_SIZE };
 
             let time_measurements = BigOTimeMeasurements {
                 pass_1_measurements: pass_1_result.time_measurements,
@@ -217,13 +258,13 @@ mod tests {
                 pass_2_measurements: pass_2_result.space_measurements,
             };
 
-            let time_complexity  = analyse_time_complexity_for_set_resizing_algorithm(&set_resizing_passes_info, &time_measurements);
-            let space_complexity = analyse_space_complexity_for_set_resizing_algorithm(&set_resizing_passes_info, &space_measurements);
+            let time_complexity  = analyse_time_complexity_for_set_resizing_iterator_algorithm(&set_resizing_passes_info, &time_measurements);
+            let space_complexity = analyse_space_complexity_for_set_resizing_iterator_algorithm(&set_resizing_passes_info, &space_measurements);
 
             let algorithm_analysis = BigOAlgorithmAnalysis {
                 time_complexity,
                 space_complexity,
-                algorithm_measurements: SetResizingAlgorithmMeasurements {
+                algorithm_measurements: SetResizingIteratorAlgorithmMeasurements {
                     measurement_name,
                     passes_info: set_resizing_passes_info,
                     time_measurements,
