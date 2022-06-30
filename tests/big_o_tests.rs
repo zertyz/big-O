@@ -113,7 +113,7 @@ fn vec_worst_case_algorithm_analysis() {
                vec.len() as u32
            },
            |n| {
-               let val = (iterations_per_pass as u32)*2 - n;
+               let val = (iterations_per_pass as u32)*5 - n;
                let mut vec = vec_locker.write();
                vec.insert(0, val);
                val
