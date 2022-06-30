@@ -26,7 +26,7 @@ V_SUFFIX=`echo ${UNPUBLISHED_VERSION} | sed "s|\(.*\.\)\(.*\)|\2|"`
 NEXT_V_SUFFIX=$((V_SUFFIX+1))
 NEXT_VERSION="${V_PREFIX}${NEXT_V_SUFFIX}"
 echo -en " from ${UNPUBLISHED_VERSION} to ${NEXT_VERSION}..."
-  sed -i "s|version = \"${UNPUBLISHED_VERSION}\"|version = \"${NEXT_VERSION}\"|" Cargo.toml &&
+  sed -i "s|version\( *\)= \"${UNPUBLISHED_VERSION}\"|version\1= \"${NEXT_VERSION}\"|" Cargo.toml &&
   echo " OK" || echo " FAILED"
 
 echo -en "  Committing & pushing Cargo.toml new version change..."
