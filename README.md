@@ -12,13 +12,13 @@
 [![big-o-test on docs.rs][docsrs-image]][docsrs]
 
 
-The `big-O-test` crate dynamically analyzes algorithms for *space* and *time* resource consumption, allowing tests to enforce a minimum
+The `big-O-test` crate dynamically analyzes algorithms for *space* and *time* resource consumption, allowing tests to enforce a maximum
 complexity -- detecting, as soon as possible, eventual performance regressions.
 
 Browse the [Docs][docsrs].
 
 
-It is able to operate both on regular and iterator algorithm -- the later being useful to test CRUD operations.
+It is able to operate both on regular and iterator algorithms -- the later being useful to test CRUD operations.
 
 Reports are issued using the `Big O Notation` (hence the name) and it works by measuring how the
 algorithm's CPU times & RAM space requirements grow in relation to the amount of data or number of elements that it is
@@ -84,6 +84,8 @@ pass          Δt              Δs            Σn            t⁻
 
 ## Regular algorithm example
 
+A regular, non-iterator algorithm is run only once for each pass -- in the example bellow, this algorithm is `vec::sort()`:
+
 ![regular_algo_example.png](screenshots/regular_algo_example.png)
 
 The optional measurement output issued by this test:
@@ -112,7 +114,9 @@ big-o-test = "0.2"
 Then create an Integration Test, setting it up to execute tests linearly -- see `tests/big_o_tests.rs` for an example
 on how this may be easily achieved.
 
-Disabling the Rust's default Parallel Test Runner is crucial for accurately measuring time & memory.
+Disabling the Rust's default Parallel Test Runner is crucial for accurately measuring time & memory -- nonetheless,
+special care was taken to avoid flaky tests: an automatic retrying mechanism kicks in when the time complexity analysis
+doesn't match the maximum accepted value.
 
 
 ## Note
