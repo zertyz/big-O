@@ -2,10 +2,8 @@
 
 use super::{
     configs::PERCENT_TOLERANCE,
-    types::{BigOAlgorithmComplexity, BigOIteratorAlgorithmType, TimeUnits, BigOTimePassMeasurements, BigOSpacePassMeasurements},
+    types::{BigOAlgorithmComplexity},
 };
-
-use std::time::{Duration};
 
 
 /// Performs the Algorithm Complexity Analysis on the resource denoted by `u`, where `u1` & `u2` are the resource
@@ -24,7 +22,7 @@ pub fn analyse_complexity(u1: f64, u2: f64, n1: f64, n2: f64) -> BigOAlgorithmCo
         BigOAlgorithmComplexity::BetweenOLogNAndON
     } else if ( ((u2 / u1) / (n2 / n1)) - 1.0 ).abs() <= PERCENT_TOLERANCE {
         BigOAlgorithmComplexity::ON
-    } else if ((u2 / u1) / ( (n2*n2.log2()) / (n1*n1.log2()) )) < 1.0 {
+    } else if ((u2 / u1) / ( (n2*n2.log2()) / (n1*n1.log2()) )) < 1.0 - PERCENT_TOLERANCE {
         BigOAlgorithmComplexity::BetweenONAndONLogN
     } else if ( ((u2 / u1) / ( (n2*n2.log2()) / (n1*n1.log2()) )) - 1.0 ).abs() <= PERCENT_TOLERANCE {
         BigOAlgorithmComplexity::ONLogN
@@ -40,9 +38,9 @@ pub fn analyse_complexity(u1: f64, u2: f64, n1: f64, n2: f64) -> BigOAlgorithmCo
         BigOAlgorithmComplexity::BetweenON3AndON4
     } else if ( ((u2 / u1) / (n2 / n1).powi(4)) - 1.0 ).abs() <= PERCENT_TOLERANCE {
         BigOAlgorithmComplexity::ON4
-    } else if (2.0_f64.powf(n1) / 2.0_f64.powf(n2)) * (u2/u1) < 1.0 {
+    } else if (u2 / u1.powf(n2/n1)) < 1.0 - PERCENT_TOLERANCE {
         BigOAlgorithmComplexity::BetweenON4AndOkN
-    } else if ( (2.0_f64.powf(n1) / 2.0_f64.powf(n2)) * (u2/u1) - 1.0).abs() <= PERCENT_TOLERANCE {
+    } else if ( (u2 / u1.powf(n2/n1)) - 1.0 ).abs() <= PERCENT_TOLERANCE {
         BigOAlgorithmComplexity::OkN
     } else {
         BigOAlgorithmComplexity::WorseThanExponential
@@ -84,6 +82,7 @@ mod tests {
         configs::{OUTPUT},
         low_level_analysis::{
             types::{
+                BigOIteratorAlgorithmType,
                 BigOAlgorithmComplexity, BigOAlgorithmAnalysis,
                 BigOTimeMeasurements, BigOSpaceMeasurements,
                 ConstantSetIteratorAlgorithmPassesInfo, SetResizingIteratorAlgorithmPassesInfo,
@@ -93,23 +92,22 @@ mod tests {
             time_analysis::*,
             space_analysis::*
         },
-        runners::common::{run_iterator_pass_verbosely, PassResult},
+        runners::common::{run_iterator_pass_verbosely},
     };
     use std::{
-        ops::Range,
-        convert::TryInto,
+        time::{Duration},
     };
     use serial_test::serial;
 
 
-    /// test algorithm complexity analysis progression when measurements increase for regular, non-iterator algorithms
+    /// test algorithm complexity analysis progression when resource utilization increase for regular, non-iterator algorithms
     /// and for constant set iterator algorithms
     #[test]
     #[serial]
     fn smooth_transitions() {
         let mut last_complexity = BigOAlgorithmComplexity::BetterThanO1;
-        for u2 in 0..500_000 {
-            let current_complexity = analyse_complexity(100.0, u2 as f64, 2.0, 14.0);
+        for u2 in 0..11_000_001 {
+            let current_complexity = analyse_complexity(10.0, u2 as f64, 2.0, 14.0);
             let delta = current_complexity as i32 - last_complexity as i32;
             assert!(delta == 0 || delta == 1, "'analyse_complexity(..., {}, ..., ...)' suddenly went from {:?} to {:?} when `u2` when from {} to {}", u2, last_complexity, current_complexity, u2-1, u2);
             if delta == 1 {
@@ -117,9 +115,10 @@ mod tests {
                 eprintln!("'analyse_complexity(...)' transitioned to {:?} when `u2`={}", current_complexity, u2);
             }
         }
+        assert_eq!(last_complexity, BigOAlgorithmComplexity::WorseThanExponential, "Please update this test to cycle through all variants of `BigOAlgorithmComplexity`");
     }
 
-    /// test algorithm complexity analysis progression when measurements increase for set resizing iterato algorithms
+    /// test algorithm complexity analysis progression when resource utilization increase for set resizing iterator algorithms
     #[test]
     #[serial]
     fn smooth_transitions_for_set_resizing_iterator_algorithm_() {
@@ -133,6 +132,7 @@ mod tests {
                 eprintln!("'analyse_set_resizing_iterator_complexity(...)' transitioned to {:?} when `u2`={}", current_complexity, u2);
             }
         }
+        assert_eq!(last_complexity, BigOAlgorithmComplexity::/*WorseThanExponential*/BetweenONAndONLogN, "Please update this test to cycle through all variantes of `BigOAlgorithmComplexity`");
     }
 
 

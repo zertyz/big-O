@@ -1,5 +1,6 @@
-//! Contains facilities for CRUD algorithms to have their performance analyzed in test methods.\
-//! See [tests] and `tests/std_containers.rs` for examples.
+//! Knows how to run & measure CRUD algorithms in the right sequence for the purpose of having
+//! their complexities analysed.\
+//! See [tests] and `tests/big-o-tests.rs` for examples.
 
 use crate::{
     configs::{OUTPUT},
@@ -22,7 +23,9 @@ use std::{
 };
 
 
-/// calls [reset_fn] before trying again
+/// Runs [analyze_crud_algorithms()], trying to match the given maximum time & space complexities to the ones observed in runtime when running the algorithm
+/// -- retrying as much as `max_retry_attempts` to avoid flaky test results.\
+/// In case of rejection, a detailed run log with measurements & analysis results is issued.
 pub fn test_crud_algorithms<'a,
     _ResetClosure:  Fn(u32) -> u32 + Sync,
     _CreateClosure: Fn(u32) -> u32 + Sync,
@@ -37,7 +40,7 @@ pub fn test_crud_algorithms<'a,
                        delete_fn: _DeleteClosure, expected_delete_time_complexity: BigOAlgorithmComplexity, expected_delete_space_complexity: BigOAlgorithmComplexity,
                        warmup_percentage: u32, create_iterations_per_pass: u32, read_iterations_per_pass: u32, update_iterations_per_pass: u32, delete_iterations_per_pass: u32,
                        create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32,
-                       time_unit: &'a TimeUnit<T>) where PassResult<'a, T>: Copy, T: Copy {                            // full report
+                       time_unit: &'a TimeUnit<T>) where PassResult<'a, T>: Copy, T: Copy {
 
     // adapts the 'iterations_per_pass' to the 'attempt' number, so each retry uses slightly different values
     fn adapt(attempt: u32, iterations_per_pass: u32) -> u32 {
@@ -65,7 +68,7 @@ pub fn test_crud_algorithms<'a,
         let adapted_update_iterations_per_pass = adapt(attempt, update_iterations_per_pass);
         let adapted_delete_iterations_per_pass = adapt(attempt, delete_iterations_per_pass);
 
-        let crud_analysis = internal_analyze_crud_algorithms(crud_name, &reset_fn,
+        let crud_analysis = internal_analyse_crud_algorithms(crud_name, &reset_fn,
                                                              &create_fn,  expected_create_time_complexity, expected_create_space_complexity,
                                                              &read_fn,     expected_read_time_complexity, expected_read_space_complexity,
                                                              &update_fn, expected_update_time_complexity, expected_update_space_complexity,
@@ -123,34 +126,34 @@ pub fn test_crud_algorithms<'a,
 /// Runs time & space analysis for Create, Read, Update and Delete algorithms -- usually from a container or database.
 /// Returns the Optional analysis for each operation + the full report, in textual form.
 /// An analysis will be None if the provided '*_iterations_per_pass' or '*_threads' are 0.\
-/// --> This function is not meant to be run in tests -- see [test_crud_algorithm] instead.
-///   - [reset_fn] -- a closure or function that will be called after warming up, to restore the empty
+/// --> This function is not meant to be run in tests -- see [test_crud_algorithms()] instead.
+///   - `reset_fn` -- a closure or function that will be called after warming up, to restore the empty
 ///                   state of the container and to deallocate any memory allocated during the warmup pass
-///                   (which only runs if [warmup_percentage] > 0)
-///   - [create_fn], [read_fn], [update_fn] & [delete_fn] -- closures or functions for each of the
+///                   (which only runs if `warmup_percentage` > 0)
+///   - `create_fn`, `read_fn`, `update_fn` & `delete_fn` -- closures or functions for each of the
 ///                                                          CRUD operations
 ///   - --> note for the functions above: they have the following signature 'fn (n: u32) -> u32', where
 ///         'n' is the number of the element to be operated on (for reset, the number of created
 ///         elements is given); all of them should return an 'u32' dependent on the execution of the
 ///         algorithm to avoid any 'call removal optimizations'
-///   - [warmup_percentage] -- [0..100]: if > 0, causes an warmup pass to be executed before the first
+///   - `warmup_percentage` -- [0..100]: if > 0, causes an warmup pass to be executed before the first
 ///                            and second passes, to hot load caches, resolve page faults, establish
 ///                            network connections or do any other operations that might impact the
 ///                            time complexity analysis. Note, however, that the [reset_fn] must
 ///                            also deallocate any allocated memory so the space complexity analysis
 ///                            is not compromised.
-///   - [create_iterations_per_pass], [read_iterations_per_pass], [update_iterations_per_pass] &
-///     [delete_iterations_per_pass] -- number of times each CRUD algorithm should run, per pass -- not
+///   - `create_iterations_per_pass`, `read_iterations_per_pass`, `update_iterations_per_pass` &
+///     `delete_iterations_per_pass` -- number of times each CRUD algorithm should run, per pass -- not
 ///                                     too small (any involved IO/OS times should be negligible) nor too
 ///                                     big (so the analysis won't take up much time nor resources)
-///   - [create_threads], [read_threads], [update_threads], [delete_threads] -- specifies how many threads
+///   - `create_threads`, `read_threads`, `update_threads`, `delete_threads` -- specifies how many threads
 ///     should be recruited for each CRUD operation. Each thread is guaranteed to call their algorithm's
 ///     closures (see the '*_fn' parameters) within a continuous range
-///   - [time_unit] -- specifies the time unit to use to measure & present time results. Notice the measured
+///   - `time_unit` -- specifies the time unit to use to measure & present time results. Notice the measured
 ///                    numbers are integers, so the unit should be at least one or two orders of magnitude
 ///                    broader than the measured values. Space measurements are always in bytes and their
 ///                    presentation unit (b, KiB, MiB or GiB) are automatically selected.
-pub fn analyze_crud_algorithms<'a,
+pub fn analyse_crud_algorithms<'a,
                                _ResetClosure:  Fn(u32) -> u32 + Sync,
                                _CreateClosure: Fn(u32) -> u32 + Sync,
                                _ReadClosure:   Fn(u32) -> u32 + Sync,
@@ -169,10 +172,9 @@ pub fn analyze_crud_algorithms<'a,
             Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a,T>> >,    // read analysis
             Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a,T>> >,    // update analysis
             Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a,T>> >,    // delete analysis
-            String) where PassResult<'a, T>: Copy, T: Copy {                            // full report
+            String) where PassResult<'a, T>: Copy, T: Copy {
 
-    // delegates the responsibility -- calling the internal function with the worst possible expected complexities will cause it never to fail
-    internal_analyze_crud_algorithms(crud_name, reset_fn,
+    internal_analyse_crud_algorithms(crud_name, reset_fn,
                                      create_fn,  BigOAlgorithmComplexity::WorseThanExponential,  BigOAlgorithmComplexity::WorseThanExponential,
                                      read_fn,     BigOAlgorithmComplexity::WorseThanExponential,   BigOAlgorithmComplexity::WorseThanExponential,
                                      update_fn, BigOAlgorithmComplexity::WorseThanExponential,  BigOAlgorithmComplexity::WorseThanExponential,
@@ -198,9 +200,9 @@ impl Display for CRUDComplexityAnalysisError {
 }
 impl Error for CRUDComplexityAnalysisError {}
 
-/// Returns the analyzed complexities + the full report, as a string in the form (create, read, update, delete, report).
+/// Returns the analysed complexities + the full report, as a string in the form (create, read, update, delete, report).
 /// If one of the measured complexities don't match the maximum expected, None is returned for that analysis, provided it's *_number_of_iterations_per_pass is > 0.
-fn internal_analyze_crud_algorithms<'a,
+fn internal_analyse_crud_algorithms<'a,
                               _ResetClosure:  Fn(u32) -> u32 + Sync,
                               _CreateClosure: Fn(u32) -> u32 + Sync,
                               _ReadClosure:   Fn(u32) -> u32 + Sync,
@@ -244,7 +246,7 @@ fn internal_analyze_crud_algorithms<'a,
     fn calc_regular_cru_range(iterations_per_pass: u32, pass_number: u32) -> Range<u32> { iterations_per_pass * pass_number       .. iterations_per_pass * (pass_number + 1) }
     fn calc_regular_d_range(iterations_per_pass: u32, pass_number: u32) -> Range<u32> { iterations_per_pass * (pass_number + 1) .. iterations_per_pass * pass_number }
 
-    /// Contains factored out code to measure & analyze READ or UPDATE operations, checking the expected maximum time & space complexities
+    /// Contains factored out code to measure & analyse READ or UPDATE operations, checking the expected maximum time & space complexities
     ///   - [pass_number] -- u32 in the range [0..NUMBER_OF_PASSES]: specifies the number of the pass being run
     ///   - [operation_name] -- &str: either "Read" or "Update"
     ///   - [suffix] -- &str: ", " or "" -- used to correctly separate intermediate results
@@ -294,7 +296,7 @@ fn internal_analyze_crud_algorithms<'a,
         }
     }
 
-    /// Contains factored out code to measure & analyze CREATE or DELETE operations, checking the expected maximum time & space complexities
+    /// Contains factored out code to measure & analyse CREATE or DELETE operations, checking the expected maximum time & space complexities
     ///   - [pass_number] -- u32 in the range [0..NUMBER_OF_PASSES]: specifies the number of the pass being run
     ///   - [operation_name] -- &str: either "Read" or "Update"
     ///   - [suffix] -- &str: ", " or "" -- used to correctly separate intermediate results
@@ -499,30 +501,6 @@ fn internal_analyze_crud_algorithms<'a,
     Ok( (create_analysis, read_analysis, update_analysis, delete_analysis, full_report) )
 }
 
-/// experimental/rudimentary assertion macro to let an 'observed_complexity' better than 'expected_complexity' to pass,
-/// in the hope to reduce false-negative test failures
-#[macro_export]
-macro_rules! assert_complexity {
-    ($observed_complexity:expr, $expected_complexity:expr $(,)?) => ({
-        match (&$observed_complexity, &$expected_complexity) {
-            (observed_complexity_val, expected_complexity_val) => {
-                if !(*observed_complexity_val as u32 <= *expected_complexity_val as u32) {
-                    assert_eq!(observed_complexity_val, expected_complexity_val, "expected enum value: {}; observed: {} -- which is not equal or less than the expected", expected_complexity_val, observed_complexity_val);
-                }
-            }
-        }
-    });
-    ($observed_complexity:expr, $expected_complexity:expr, $($arg:tt)+) => ({
-        match (&$observed_complexity, &$expected_complexity) {
-            (observed_complexity_val, expected_complexity_val) => {
-                if !(*observed_complexity_val as u32 <= *expected_complexity_val as u32) {
-                    assert_eq!(observed_complexity_val, expected_complexity_val, $($arg)+);
-                }
-            }
-        }
-    });
-}
-
 
 #[cfg(any(test, feature="dox"))]
 mod tests {
@@ -531,8 +509,7 @@ mod tests {
 
     use super::*;
     use crate:: {
-        configs::{self, ALLOC},
-        low_level_analysis::types::{TimeUnits, BigOAlgorithmMeasurements, BigOAlgorithmComplexity},
+        low_level_analysis::types::{TimeUnits, BigOAlgorithmMeasurements},
     };
     use std::{
         collections::HashMap,
@@ -545,7 +522,7 @@ mod tests {
     ///   - sub-reports are only created when 'iterations_per_pass' for the operation is > 0
     #[cfg_attr(not(feature = "dox"), test)]
     #[serial]                                  // needed since considerable RAM is used (which may interfere with 'crud_analysis.rs' tests)
-    fn analyze_crud_algorithm_output_check() {
+    fn analyse_crud_algorithm_output_check() {
         let iterations_per_pass = 100000;
 
         // high level asserting functions
@@ -609,7 +586,7 @@ mod tests {
              read_analysis,
              update_analysis,
              delete_analysis,
-             report) = analyze_crud_algorithms("MyContainer",
+             report) = analyse_crud_algorithms("MyContainer",
                                                |n| (n+1)/(n+1),
                                                |n| (n+1)/(n+1),
                                                |n| (n+1)/(n+1),
@@ -631,7 +608,7 @@ mod tests {
              _read_analysis,
              _update_analysis,
              _delete_analysis,
-             report) = analyze_crud_algorithms("MyContainer",
+             report) = analyse_crud_algorithms("MyContainer",
                                                |_n| panic!("'reset_fn' should not be called if there is no warmup taking place"),
                                                |n| (n+1)/(n+1),
                                                |n| (n+1)/(n+1),
@@ -647,7 +624,7 @@ mod tests {
             _read_analysis,
             _update_analysis,
             delete_analysis,
-            report) = analyze_crud_algorithms("MyContainer",
+            report) = analyse_crud_algorithms("MyContainer",
                                               |_n| panic!("'reset_fn' should not be called if there is no warmup taking place"),
                                               |n| (n+1)/(n+1),
                                               &|n| (n+1)/(n+1),
@@ -664,7 +641,7 @@ mod tests {
             _read_analysis,
             _update_analysis,
             _delete_analysis,
-            report) = analyze_crud_algorithms("MyContainer",
+            report) = analyse_crud_algorithms("MyContainer",
                                               |_n| panic!("'reset_fn' should not be called if there is no warmup taking place"),
                                               |n| (n+1)/(n+1),
                                               &|_n| panic!("'read_fn' should not be called if there is no warmup taking place"),
@@ -685,7 +662,7 @@ mod tests {
         for n_threads in [1,2,4,5,10] {
             let map_locker = parking_lot::RwLock::new(HashMap::<u32, u32>::with_capacity(2 * iterations_per_pass as usize));
             let max_length = AtomicU32::new(0);
-            analyze_crud_algorithms("thread_chunk_division",
+            analyse_crud_algorithms("thread_chunk_division",
                 |_n| {0},
                 |n| {
                    let mut map = map_locker.write();

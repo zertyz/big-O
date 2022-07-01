@@ -90,7 +90,7 @@ impl Default for SavePointRingBufferSlot<AtomicUsize> {
 }
 
 /// The replacement for the System's Global Allocator.\
-/// See [self] for more info.
+/// See [super] for more info.
 pub struct MetricsAllocator<'a, const RING_BUFFER_SIZE: usize> {
     system_allocator:        &'a System,
     statistics:              MetricsAllocatorStatistics<AtomicUsize>,
@@ -99,7 +99,7 @@ pub struct MetricsAllocator<'a, const RING_BUFFER_SIZE: usize> {
 impl<'a, const RING_BUFFER_SIZE: usize> MetricsAllocator<'a, RING_BUFFER_SIZE> {
 
     /// Creates an instance capable of replacing the Global Allocator.\
-    /// See [self] for more info.
+    /// See [super] for more info.
     pub const fn new() -> Self {
         Self {
             system_allocator: &System,

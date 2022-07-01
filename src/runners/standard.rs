@@ -1,9 +1,12 @@
-use std::time::SystemTime;
+//! Knows how to run & measure regular, non-iterator algorithms for the purpose of having their complexities analysed.\
+// //! See [tests] and `tests/big-o-tests.rs` for examples.
+
 use crate::{
-    configs::{OUTPUT,ALLOC},
+    configs::{OUTPUT},
     low_level_analysis::{
         self,
         types::{
+            BigOAlgorithmAnalysis,
             BigOAlgorithmComplexity,
             AlgorithmPassesInfo,
             AlgorithmMeasurements,
@@ -13,13 +16,18 @@ use crate::{
     },
     runners::common::*
 };
-use crate::low_level_analysis::types::BigOAlgorithmAnalysis;
 
 
+/// TODO
 pub fn test_constant_set_iterator_algorithm() {}
+
+/// TODO
 pub fn test_set_resizing_iterator_algorithm() {}
 
-
+/// Runs [analyse_algorithm()], trying to match the given maximum time & space complexities to the ones observed in runtime when running the algorithm
+/// -- retrying as much as `max_retry_attempts` to avoid flaky test results.\
+/// /// In case of rejection, a detailed run log with measurements & analysis results is issued.
+/// TODO follow the same design & features as in crud.rs -- specially the retrying & error handling
 pub fn test_algorithm<_ScalarDuration: TryInto<u64> + Copy>
                      (test_name:                &str,                    max_retry_attempts:        u32,
                       mut reset_fn:             impl FnMut(),
@@ -61,10 +69,15 @@ pub fn test_algorithm<_ScalarDuration: TryInto<u64> + Copy>
 
 
     if observed_space_complexity as u32 > expected_space_complexity as u32 {
-        OUTPUT(&format!("\n ** Aborted due to SPACE complexity mismatch on '{}' operation: maximum: {:?}, measured: {:?}\n\n", test_name, expected_space_complexity, observed_space_complexity));
+        let msg = format!("\n ** Aborted due to SPACE complexity mismatch on '{}' operation: maximum: {:?}, measured: {:?}\n\n", test_name, expected_space_complexity, observed_space_complexity);
+        OUTPUT(&msg);
+        panic!("{}", msg);
     }
     if observed_time_complexity as u32 > expected_time_complexity as u32 {
-        OUTPUT(&format!("\n ** Aborted due to TIME complexity mismatch on '{}' operation: maximum: {:?}, measured: {:?}\n\n", test_name, expected_time_complexity, observed_time_complexity));
+        let msg = format!("\n ** Aborted due to TIME complexity mismatch on '{}' operation: maximum: {:?}, measured: {:?}\n\n", test_name, expected_time_complexity, observed_time_complexity);
+        OUTPUT(&msg);
+        panic!("{}", msg);
     }
-    OUTPUT(&format!("r={}\n\n", r1 | r2));
+
+    OUTPUT(&format!("r={}\n\n", r0 ^ r1 ^ r2));
 }

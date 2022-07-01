@@ -3,7 +3,7 @@
 //!   - [space_analysis]
 //!   - [types]
 //!
-//! ... and, most importantly, tests both analysis on real functions. See [tests].
+//! ... and, most importantly, tests both analysis on real functions. See [low_level_analysis::tests].
 
 mod low_level_analysis;
 pub use low_level_analysis::*;

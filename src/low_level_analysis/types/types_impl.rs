@@ -33,7 +33,7 @@ impl BigOAlgorithmComplexity {
     pub fn as_time_pretty_str(&self) -> &'static str {
         match self {
             Self::BetterThanO1      => "Better than O(1) -- aren't the machines idle? too many threads? too little RAM?",
-            Self::WorseThanExponential => "Worse than O(n) -- really, really bad algorithm, too short execution times or is there a hidden bug?",
+            Self::WorseThanExponential => "Worse than Exponential!! -- worse than O(k^n) -- really, really bad algorithm, too short execution times or is there a hidden bug?",
             _ => self.as_pretty_str(),
         }
     }
@@ -41,7 +41,7 @@ impl BigOAlgorithmComplexity {
     pub fn as_space_pretty_str(&self) -> &'static str {
         match self {
             Self::BetterThanO1      => "Better than O(1) -- are initialization allocations involved? Consider using a warm up pass",
-            Self::WorseThanExponential => "Worse than O(n) -- really, really bad algorithm or is there a hidden bug?",
+            Self::WorseThanExponential => "Worse than Exponential!! -- worse than O(k^n) -- really, really bad algorithm or is there a hidden bug?",
             _ => self.as_pretty_str(),
         }
     }
@@ -241,43 +241,57 @@ mod tests {
 
 
     use crate::{
-        configs::{OUTPUT},
         low_level_analysis::{
-            types::{
-                BigOAlgorithmComplexity, BigOAlgorithmAnalysis,
-                BigOTimeMeasurements, BigOSpaceMeasurements,
-                ConstantSetIteratorAlgorithmPassesInfo, SetResizingIteratorAlgorithmPassesInfo,
-                ConstantSetIteratorAlgorithmMeasurements, SetResizingIteratorAlgorithmMeasurements,
-                TimeUnit, TimeUnits
-            },
-            time_analysis::*,
-            space_analysis::*
+            types::BigOAlgorithmComplexity,
         },
-        runners::common::{run_iterator_pass, PassResult},
-    };
-    use std::{
-        ops::Range,
-        convert::TryInto,
     };
     use serial_test::serial;
 
 
-    /// assures serializations & implementors of *Display* from [types] work as they should
+    /// assures serializations & implementors of *Display* from [types] work without panics
+    /// -- also outputs them for manual inspection
     #[cfg_attr(not(feature = "dox"), test)]
     #[serial]
     fn serialization() {
-        OUTPUT("BigOAlgorithmComplexity enum members, as strings:\n");
+        println!("BigOAlgorithmComplexity enum members, as strings:");
         let enum_members = [
             BigOAlgorithmComplexity::BetterThanO1,
             BigOAlgorithmComplexity::O1,
             BigOAlgorithmComplexity::OLogN,
             BigOAlgorithmComplexity::BetweenOLogNAndON,
             BigOAlgorithmComplexity::ON,
+            BigOAlgorithmComplexity::BetweenONAndONLogN,
+            BigOAlgorithmComplexity::ONLogN,
+            BigOAlgorithmComplexity::BetweenONLogNAndON2,
+            BigOAlgorithmComplexity::ON2,
+            BigOAlgorithmComplexity::BetweenON2AndON3,
+            BigOAlgorithmComplexity::ON3,
+            BigOAlgorithmComplexity::BetweenON3AndON4,
+            BigOAlgorithmComplexity::ON4,
+            BigOAlgorithmComplexity::BetweenON4AndOkN,
+            BigOAlgorithmComplexity::OkN,
             BigOAlgorithmComplexity::WorseThanExponential,
         ];
         for enum_member in enum_members {
-            OUTPUT(&format!("\t{:?} => '{}'\n", enum_member, enum_member.as_pretty_str()));
+            println!("\t{:?}:\n\t\t=> '{}'", enum_member, enum_member.as_pretty_str());
         }
-        OUTPUT("\n");
+        println!("\n");
+
+        let special_enum_members = [
+            BigOAlgorithmComplexity::BetterThanO1,
+            BigOAlgorithmComplexity::WorseThanExponential,
+        ];
+
+        println!(" .as_time_pretty_str():");
+        for enum_member in special_enum_members {
+            println!("\t{:?}:\n\t\t=> '{}'", enum_member, enum_member.as_pretty_str());
+        }
+        println!("\n");
+
+        println!(" .as_space_pretty_str():");
+        for enum_member in special_enum_members {
+            println!("\t{:?}:\n\t\t=> '{}'", enum_member, enum_member.as_pretty_str());
+        }
+        println!("\n");
     }
 }

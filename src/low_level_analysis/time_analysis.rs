@@ -4,7 +4,6 @@ use crate::low_level_analysis::{
     analyse_complexity,
     analyse_set_resizing_iterator_complexity,
     types::*,
-    configs::*,
 };
 
 
@@ -77,6 +76,7 @@ mod tests {
     //! Unit tests for [time_analysis](super) module
 
     use super::*;
+    use crate::configs::*;
     use serial_test::serial;
 
 
@@ -145,6 +145,47 @@ mod tests {
                    pass_2_measurements: BigOTimePassMeasurements { elapsed_time: 4000, time_unit: &TimeUnits::MICROSECOND }
                });
 
+        assert("Theoretical O(n³) algorithm", BigOAlgorithmComplexity::ON3,
+               AlgorithmPassesInfo { pass1_n: 1000, pass2_n: 2000 },
+               BigOTimeMeasurements {
+                   pass_1_measurements: BigOTimePassMeasurements { elapsed_time: 1000, time_unit: &TimeUnits::MICROSECOND },
+                   pass_2_measurements: BigOTimePassMeasurements { elapsed_time: 8000, time_unit: &TimeUnits::MICROSECOND }
+               });
+
+        assert("Theoretical O(n^4) algorithm", BigOAlgorithmComplexity::ON4,
+               AlgorithmPassesInfo { pass1_n: 1000, pass2_n: 2000 },
+               BigOTimeMeasurements {
+                   pass_1_measurements: BigOTimePassMeasurements { elapsed_time:  1000, time_unit: &TimeUnits::MICROSECOND },
+                   pass_2_measurements: BigOTimePassMeasurements { elapsed_time: 16000, time_unit: &TimeUnits::MICROSECOND }
+               });
+
+        assert("Theoretical O(k^n) algorithm", BigOAlgorithmComplexity::OkN,
+               AlgorithmPassesInfo { pass1_n: 10, pass2_n: 70 },
+               BigOTimeMeasurements {
+                   pass_1_measurements: BigOTimePassMeasurements { elapsed_time: 1.0e1 as u64,                   time_unit: &TimeUnits::MICROSECOND },
+                   pass_2_measurements: BigOTimePassMeasurements { elapsed_time: 1.0e7 as u64, time_unit: &TimeUnits::MICROSECOND }
+               });
+
+        assert("O(k^n) algorithm (10% lower than the theoretical value)", BigOAlgorithmComplexity::OkN,
+               AlgorithmPassesInfo { pass1_n: 10, pass2_n: 70 },
+               BigOTimeMeasurements {
+                   pass_1_measurements: BigOTimePassMeasurements { elapsed_time: 1.0e1 as u64,           time_unit: &TimeUnits::MICROSECOND },
+                   pass_2_measurements: BigOTimePassMeasurements { elapsed_time: (1.0e7 * 0.901) as u64, time_unit: &TimeUnits::MICROSECOND }
+               });
+
+        assert("O(k^n) algorithm (10% greater than the theoretical value)", BigOAlgorithmComplexity::OkN,
+               AlgorithmPassesInfo { pass1_n: 10, pass2_n: 70 },
+               BigOTimeMeasurements {
+                   pass_1_measurements: BigOTimePassMeasurements { elapsed_time: 1.0e1 as u64,           time_unit: &TimeUnits::MICROSECOND },
+                   pass_2_measurements: BigOTimePassMeasurements { elapsed_time: (1.0e7 * 1.099) as u64, time_unit: &TimeUnits::MICROSECOND }
+               });
+
+        assert("Worse than exponential algorithm", BigOAlgorithmComplexity::WorseThanExponential,
+               AlgorithmPassesInfo { pass1_n: 10, pass2_n: 70 },
+               BigOTimeMeasurements {
+                   pass_1_measurements: BigOTimePassMeasurements { elapsed_time: 1.0e1 as u64,           time_unit: &TimeUnits::MICROSECOND },
+                   pass_2_measurements: BigOTimePassMeasurements { elapsed_time: (1.0e7 * 1.101) as u64, time_unit: &TimeUnits::MICROSECOND }
+               });
 
     }
 
@@ -193,11 +234,11 @@ mod tests {
                    pass_2_measurements: BigOTimePassMeasurements { time_unit: &TimeUnits::MICROSECOND, elapsed_time: 200 },
         });
 
-        assert("Theoretical worse than O(n) Update/Select", BigOAlgorithmComplexity::BetweenONAndONLogN,
+        assert("Theoretical worse than O(n) Update/Select", BigOAlgorithmComplexity::ONLogN,
                ConstantSetIteratorAlgorithmPassesInfo { pass_1_set_size: 1000, pass_2_set_size: 2000, repetitions: 1000 },
                BigOTimeMeasurements {
                    pass_1_measurements: BigOTimePassMeasurements { time_unit: &TimeUnits::MICROSECOND, elapsed_time: 100 },
-                   pass_2_measurements: BigOTimePassMeasurements { time_unit: &TimeUnits::MICROSECOND, elapsed_time: 220 },
+                   pass_2_measurements: BigOTimePassMeasurements { time_unit: &TimeUnits::MICROSECOND, elapsed_time: 226 },
         });
 
     }

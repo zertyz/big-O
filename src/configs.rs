@@ -1,17 +1,27 @@
-//! Contains conditional compilation definitions attending to:
-//!   - "features" definitions, client project's Cargo "[dependencies]" declarations
-//!   - Release / Debug compilations
+//! Contains constants used throughout this crate
 
 #![allow(dead_code)]
 
 use std::io::{stdout,stderr,Write};
 use crate::metrics_allocator::MetricsAllocator;
 
-/// acceptable variance / measurement errors when analysing algorithm's time & space complexities
+/// acceptable proportional variance (acceptable measurement errors) when analysing algorithm's time & space complexities
 pub const PERCENT_TOLERANCE: f64 = 0.10;
 
-// if features = stdout
+/// Function to output an `&str` -- used to sink analysis reports -- controlled by the crate's features (stdout, stderr, no_output)
 pub const OUTPUT: fn(&str) = stdout_write;
+
+//#[cfg(test)]
+// cfg(test) above seems not to work for library crates. That should go into "features", then?
+#[global_allocator]
+/// Allows access to the metrics allocator -- replacing the Global Allocator for tests
+/// (provided this crate is used as `dev-dependency`)
+pub static ALLOC: MetricsAllocator<SAVE_POINT_RING_BUFFER_SIZE> = MetricsAllocator::new();
+
+/// Regarding the [MetricsAllocator] used for space complexity analysis, this property specifies the maximum number of "save points"
+/// that might be in use at the same time
+pub const SAVE_POINT_RING_BUFFER_SIZE: usize = 1024;
+
 
 fn stdout_write(buf: &str) {
     stdout().flush().unwrap();
@@ -33,12 +43,3 @@ fn null_write(_buf: &str) {
     // release compilations will optimize out this call for '_buf' is not used
 }
 
-/// maximum number of "save points" that might be in use at the same time
-/// (for which a call to [MetricsAllocatorStatistics.delta_statistics] will still be made)
-pub const SAVE_POINT_RING_BUFFER_SIZE: usize = 1024;
-
-//#[cfg(test)]
-// cfg(test) above seems not to work for library crates. That should go into "features", then?
-#[global_allocator]
-/// Custom allocator when running tests
-pub static ALLOC: MetricsAllocator<SAVE_POINT_RING_BUFFER_SIZE> = MetricsAllocator::new();

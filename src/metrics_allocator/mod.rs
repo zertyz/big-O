@@ -1,5 +1,5 @@
 //! Global allocator (wrapper around the System's default allocator) capable of gathering allocation/de-allocation/re-allocation metrics
-//! and (min, max) memory usage between two (or more) points in time.
+//! and min/max memory usage between two (or more) points in time.
 //!
 //! Activate it with:
 //! ```no_compile

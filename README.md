@@ -28,7 +28,12 @@ By using this crate on *tests*, you are enforcing -- through real measurements -
 should behave in regard to resource consumption -- allowing you to foresee, when in production, the resource requirements
 and, eventually, helping in the process of optimization, as you are free to do changes that are sure to cause a test failure
 when regressions in space or time complexities are introduced.
-It is, as such, meant to work as a *development tool*, alongside with *tests* & *benchmarks*.
+
+Furthermore, this crate is specially useful to analyse complex algorithms on complex execution scenarios, when a tradicional *manual*
+analysis is impossible to be done: a carefully crafted *Big O Performance Test* is able to investigate/enforce what inputs make up the
+worse acceptable performance case, best case and how, on average, the algorithm should perform on excerpts of *real data*.
+
+This crate is, thus, meant to work as a *development tool*, alongside with *tests* & *benchmarks*.
 
 A distinction is made between regular, non-iterator Algorithms and Iterator Algorithms.
 The latter encompasses algorithms that operate on a single element per call;

@@ -46,98 +46,107 @@ pub enum BigOIteratorAlgorithmType {
     ConstantSet,
 }
 
-/// base trait for [SetResizingAlgorithmMeasurements] & [ConstantSetAlgorithmMeasurements], made public
-/// to attend to rustc's rules. Most probably this trait is of no use outside it's own module.
+/// base trait for [SetResizingIteratorAlgorithmMeasurements] & [ConstantSetIteratorAlgorithmMeasurements].
 pub trait BigOAlgorithmMeasurements: Display {
     fn space_measurements(&self) -> &BigOSpaceMeasurements;
 }
 
-/// return result for this module's functions for analysing *constant set* & *set resizing* algorithms.
-/// See [super::time_analysis] & [super::space_analysis]
+/// Return result for this submodule's functions for analysing the complexity of algorithms.\
+/// Known structs to implement the [BigOAlgorithmMeasurements] trait are:
+///   * [AlgorithmMeasurements]
+///   * [ConstantSetIteratorAlgorithmMeasurements]
+///   * [SetResizingIteratorAlgorithmMeasurements]
+///
+/// See the functions in [super::time_analysis] & [super::space_analysis].
 pub struct BigOAlgorithmAnalysis<T: BigOAlgorithmMeasurements> {
     pub time_complexity:         BigOAlgorithmComplexity,
     pub space_complexity:        BigOAlgorithmComplexity,
     pub algorithm_measurements:  T,
 }
 
-/// Type for [BigOAlgorithmAnalysis::algorithm_measurements] when analyzing regular algorithms
-/// (non-iterator algorithms) -- such as sort, fib, ...
+/// Contains the measurements for regular, non-iterator algorithms, so that they may have their time & space complexities analysed\
+/// -- non-iterator algorithms: sort, fib, ...\
+/// For iterator algorithms, see [ConstantSetIteratorAlgorithmMeasurements] & [SetResizingIteratorAlgorithmMeasurements]
 pub struct AlgorithmMeasurements<'a, ScalarTimeUnit: Copy> {
     /// a name for these measurements, for presentation purposes
     pub measurement_name:   &'a str,
-    /// each pass info for use in the time & space complexity analysis
+    /// run pass info
     pub passes_info:        AlgorithmPassesInfo,
+    /// times measured for each pass run
     pub time_measurements:  BigOTimeMeasurements<'a, ScalarTimeUnit>,
+    /// allocations / de-allocations measured for each pass run
     pub space_measurements: BigOSpaceMeasurements,
 }
 
-/// Type for [BigOAlgorithmAnalysis::algorithm_measurements] when analyzing iterator algorithms
-/// that do not change the set size they operate on -- select/update, get, ...
-/// See also [SetResizingAlgorithmMeasurements]
+/// Contains the measurements for iterator algorithms that do not alter the data set size they operate on\
+/// -- such as select/update, get, ... \
+/// See also [SetResizingIteratorAlgorithmMeasurements] or, for non-iterator algorithms, [AlgorithmMeasurements]
 pub struct ConstantSetIteratorAlgorithmMeasurements<'a, ScalarTimeUnit: Copy> {
     /// a name for these measurements, for presentation purposes
     pub measurement_name:   &'a str,
-    /// each pass info for use in the time & space complexity analysis
+    /// run pass info
     pub passes_info:        ConstantSetIteratorAlgorithmPassesInfo,
+    /// times measured for each pass run
     pub time_measurements:  BigOTimeMeasurements<'a, ScalarTimeUnit>,
+    /// allocations / de-allocations measured for each pass run
     pub space_measurements: BigOSpaceMeasurements,
 }
 
-/// Type for [BigOAlgorithmAnalysis::algorithm_measurements] when analyzing iterator algorithms
-/// that change the set size they operate on -- insert/delete, enqueue/dequeue, push/pop, add/remove, ...
-/// See also [ConstantSetAlgorithmMeasurements]
+/// Contains the measurements for iterator algorithms that change the data set size they operate on\
+/// -- such as insert/delete, enqueue/dequeue, push/pop, add/remove, ...
+/// See also [ConstantSetIteratorAlgorithmMeasurements] or, for non-iterator algorithms, [AlgorithmMeasurements]
 pub struct SetResizingIteratorAlgorithmMeasurements<'a, ScalarTimeUnit: Copy> {
     /// a name for these measurements, for presentation purposes
     pub measurement_name: &'a str,
-    /// each pass info for use in the time & space complexity analysis
+    /// run pass info
     pub passes_info:        SetResizingIteratorAlgorithmPassesInfo,
+    /// times measured for each pass run
     pub time_measurements:  BigOTimeMeasurements<'a, ScalarTimeUnit>,
+    /// allocations / de-allocations measured for each pass run
     pub space_measurements: BigOSpaceMeasurements,
 }
 
-/// represents an algorithm's run-time time measurements for passes 1 & 2, so that it can have it's time complexity analyzed
+/// represents an algorithm's execution time measurements for passes 1 & 2
 pub struct BigOTimeMeasurements<'a, ScalarTimeUnit: Copy> {
     pub pass_1_measurements: BigOTimePassMeasurements<'a, ScalarTimeUnit>,
     pub pass_2_measurements: BigOTimePassMeasurements<'a ,ScalarTimeUnit>,
 }
 
-/// the elapsed time & unit taken to run one of the 2 passes for the algorithm time complexity analysis.
-/// Contained in [BigOTimeMeasurements].
+/// the elapsed time & unit taken to run one of the 2 passes for the algorithm
 #[derive(Clone,Copy)]
 pub struct BigOTimePassMeasurements<'a, ScalarTimeUnit> where ScalarTimeUnit: Clone+Copy {
-    /// the time it took to run a pass
+    /// the time it took to run
     pub elapsed_time: u64,
-    /// unit for the measurements in this struct
+    /// precision/unit for the measurements
     pub time_unit: &'a TimeUnit<ScalarTimeUnit>,
 }
 
-/// represents an algorithm's run-time memory usage measurements for passes 1 & 2, in bytes, so that it can have it's space complexity analyzed
+/// represents an algorithm's execution memory usage measurements for passes 1 & 2 -- in bytes
 pub struct BigOSpaceMeasurements {
     pub pass_1_measurements: BigOSpacePassMeasurements,
     pub pass_2_measurements: BigOSpacePassMeasurements,
 }
 
-/// memory usage measurements, in bytes, for a pass execution -- 2 of them are stored in [BigOSpaceMeasurements]
-/// and are required to perform the space complexity analysis.
+/// memory usage measurements, in bytes, for a pass execution
 #[derive(Debug,Clone,Copy)]
 pub struct BigOSpacePassMeasurements {
-    /// heap memory in use just before starting the pass
+    /// heap memory in use just before starting the pass execution
     pub used_memory_before: usize,
     /// heap memory in use just after the pass execution
     pub used_memory_after:  usize,
-    /// maximum heap memory in use during the pass execution
+    /// maximum heap memory used during the pass execution
     pub max_used_memory:    usize,
-    /// minimum heap memory in use during the pass execution
+    /// minimum heap memory used during the pass execution
     pub min_used_memory:    usize,
 }
 
 /// Represents the "pass" information (info for the runner that measures time & space resource consumptions)
-/// for regular Algorithms which we want to perform the complexity analysis for.\
-/// Note that "Regular Algorithms" is in opposition to Iterator Algorithms
+/// for regular, non-iterator Algorithms which we want to perform the complexity analysis for.\
+/// Note that *Regular Algorithms* is in opposition to *Iterator Algorithms*
 pub struct AlgorithmPassesInfo {
-    /// elements processed on "pass 1"
+    /// elements processed on the first pass
     pub pass1_n: u32,
-    /// elements pocessed on "pass 2"
+    /// elements processed on the second pass (usually the double of the first)
     pub pass2_n: u32,
 }
 
@@ -148,8 +157,8 @@ pub struct ConstantSetIteratorAlgorithmPassesInfo {
     pub pass_1_set_size: u32,
     /// set size when running "pass 2"
     pub pass_2_set_size: u32,
-    /// number of times the algorithm ran on each pass -- or, in other words, the "n" in the O(n) notation;
-    /// each algorithm iteration should behave as executing on the same element without leaving side-effects
+    /// number of times the algorithm should run on each pass,
+    /// where each run operates on a single element
     pub repetitions: u32,
 }
 
@@ -158,11 +167,11 @@ pub struct ConstantSetIteratorAlgorithmPassesInfo {
 pub struct SetResizingIteratorAlgorithmPassesInfo {
     /// number of elements added / removed on each pass;
     /// each algorithm iteration should either add or remove a single element
-    /// and the test set must start or end with 0 elements
+    /// and the test set must start (and/or end) with 0 elements
     pub delta_set_size: u32,
 }
 
-/// Specifies a time unit for the 'big-O' crate when measuring / reporting results.
+/// Specifies a time unit when measuring / reporting results.
 /// Please use one of the prebuilt 'TimeUnits' constants instead of instantiating this:
 /// [TimeUnits::NANOSECOND], [TimeUnits::MICROSECOND], [TimeUnits::MILLISECOND],  [TimeUnits::SECOND]
 pub struct TimeUnit<T> {

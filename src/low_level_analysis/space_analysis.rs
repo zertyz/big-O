@@ -1,18 +1,12 @@
 //! Contains functions to perform Algorithm's Space Complexity Analysis.
 //!
-//! Here we analyze two types of algorithms: the ones that alter the size of the set they operate on (insert/delete) and
-//! the ones that don't, so the correct Big-O notation can be given.
-//!
-//! The complexity analysis is done on the max_memory used -- which includes any auxiliary memory used, but then freed,
-//! on an insertion, for example. Since the algorithm is supposed to run several times, the auxiliary memory tends to
-//! cause a negligible effect on the analysis, when compared to the non-auxiliary allocations (provided you algorithm is ok).
-//!
+//! The complexity analysis is done on the `max_memory` used -- which includes any *auxiliary memory* used, where
+//! *auxiliary memory* means allocations that were done, but then freed before the algorithm finishes,
 
 use crate::low_level_analysis::{
     analyse_complexity,
     analyse_set_resizing_iterator_complexity,
     types::*,
-    configs::*,
 };
 
 
