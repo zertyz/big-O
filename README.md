@@ -20,13 +20,13 @@ Browse the [Docs][docsrs].
 
 It is able to operate both on regular and iterator algorithms -- the later being useful to test CRUD operations.
 
-Reports are issued using the `Big O Notation` (hence the name) and it works by measuring how the
+Reports are issued using the *Big O Notation* (hence the name) and it works by measuring how the
 algorithm's CPU times & RAM space requirements grow in relation to the amount of data or number of elements that it is
 applied on.
 
-By using this crate on `tests`, you are enforcing -- through real measurements -- how your program
-should behave in regard to resource consumption -- allowing you to foresee the current resource requirements/limits and,
-eventually, helping in the process of optimization, as you are free to do changes that are sure to cause a test failure
+By using this crate on *tests*, you are enforcing -- through real measurements -- how your program
+should behave in regard to resource consumption -- allowing you to foresee, when in production, the resource requirements
+and, eventually, helping in the process of optimization, as you are free to do changes that are sure to cause a test failure
 when regressions in space or time complexities are introduced.
 It is, as such, meant to work as a *development tool*, alongside with *tests* & *benchmarks*.
 

@@ -22,9 +22,9 @@ pub fn test_set_resizing_iterator_algorithm() {}
 
 pub fn test_algorithm<_ScalarDuration: TryInto<u64> + Copy>
                      (test_name:                &str,                    max_retry_attempts:        u32,
-                      reset_fn:                 impl Fn(),
-                      pass1_set_size:           u32,                     pass1_algorithm:           impl Fn() -> u32,
-                      pass2_set_size:           u32,                     pass2_algorithm:           impl Fn() -> u32,
+                      mut reset_fn:             impl FnMut(),
+                      pass1_set_size:           u32,                     pass1_algorithm:           impl FnMut() -> u32,
+                      pass2_set_size:           u32,                     pass2_algorithm:           impl FnMut() -> u32,
                       expected_time_complexity: BigOAlgorithmComplexity, expected_space_complexity: BigOAlgorithmComplexity,
                       time_unit:                &TimeUnit<_ScalarDuration>,
                       ) {

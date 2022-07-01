@@ -12,10 +12,21 @@ use std::fmt::Display;
 pub enum BigOAlgorithmComplexity {
     BetterThanO1,
     O1,
+    BetweenO1AndOLogN,
     OLogN,
     BetweenOLogNAndON,
     ON,
-    WorseThanON,
+    BetweenONAndONLogN,
+    ONLogN,
+    BetweenONLogNAndON2,
+    ON2,
+    BetweenON2AndON3,
+    ON3,
+    BetweenON3AndON4,
+    ON4,
+    BetweenON4AndOkN,
+    OkN,
+    WorseThanExponential,
 }
 
 /// Specifies if the iterator algorithm under analysis alters the data set it works on or if it has no side-effects on it.\

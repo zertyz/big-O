@@ -173,10 +173,10 @@ pub fn analyze_crud_algorithms<'a,
 
     // delegates the responsibility -- calling the internal function with the worst possible expected complexities will cause it never to fail
     internal_analyze_crud_algorithms(crud_name, reset_fn,
-                                     create_fn,  BigOAlgorithmComplexity::WorseThanON, BigOAlgorithmComplexity::WorseThanON,
-                                     read_fn,     BigOAlgorithmComplexity::WorseThanON,  BigOAlgorithmComplexity::WorseThanON,
-                                     update_fn, BigOAlgorithmComplexity::WorseThanON,BigOAlgorithmComplexity::WorseThanON,
-                                     delete_fn, BigOAlgorithmComplexity::WorseThanON,BigOAlgorithmComplexity::WorseThanON,
+                                     create_fn,  BigOAlgorithmComplexity::WorseThanExponential,  BigOAlgorithmComplexity::WorseThanExponential,
+                                     read_fn,     BigOAlgorithmComplexity::WorseThanExponential,   BigOAlgorithmComplexity::WorseThanExponential,
+                                     update_fn, BigOAlgorithmComplexity::WorseThanExponential,  BigOAlgorithmComplexity::WorseThanExponential,
+                                     delete_fn,  BigOAlgorithmComplexity::WorseThanExponential,  BigOAlgorithmComplexity::WorseThanExponential,
                                      warmup_percentage, create_iterations_per_pass, read_iterations_per_pass, update_iterations_per_pass, delete_iterations_per_pass,
                                      create_threads, read_threads, update_threads, delete_threads,
                                      time_unit).unwrap()
