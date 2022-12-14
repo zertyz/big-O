@@ -13,7 +13,7 @@
 
 
 The `big-O-test` crate dynamically analyzes algorithms for *space* and *time* resource consumption, allowing tests to enforce a maximum
-complexity -- detecting, as soon as possible, eventual performance regressions.
+complexity -- detecting, as soon as possible, eventual performance regressions on your program.
 
 Browse the [Docs][docsrs].
 
@@ -36,19 +36,21 @@ worse acceptable performance case, best case and how, on average, the algorithm 
 This crate is, thus, meant to work as a *development tool*, alongside with *tests* & *benchmarks*.
 
 A distinction is made between regular, non-iterator Algorithms and Iterator Algorithms.
-The latter encompasses algorithms that operate on a single element per call;
-they may fit into the following categories:
-  * those that alter the amount of data they operate on -- such as inserts, deletes, extractions and loads (EtL)
-  * those that operate on a constant data set -- such as queries and data transformations (eTl)
+The latter encompasses algorithms that operate on a single element per call, which
+may fit into the following categories:
+  * those that alter the amount of data they operate on -- such as inserts & deletes
+  * those that operate on a constant data set -- such as queries, updates and data transformations (eTl)
 
-A special method is provided to test CRUD operations, as in the example bellow:
+A special method is provided to test CRUD operations, as they should be done following special rules
+to provide accurate measurements -- see the example bellow:
 
 
 ## CRUD test example
 
+Tests CRUD iterator algorithms (called several times per pass, as a single call processes a single element):
 ![crud_example.png](screenshots/crud_example.png)
 
-The optional measurement output issued by this test:
+The optional measurement/analysis output issued by this test:
 ````no_compile
 Vec Insert & Remove (worst case) with ParkingLot CRUD Algorithm Complexity Analysis:
   First Pass (create: 8090µs/+64.42KiB, read: 15254µs/+432.00b, update: 13948µs/+432.00b); Second Pass (create: 22440µs/+64.42KiB, read: 15232µs/+432.00b, update: 13839µs/+432.00b):
@@ -93,7 +95,7 @@ A regular, non-iterator algorithm is run only once for each pass -- in the examp
 
 ![regular_algo_example.png](screenshots/regular_algo_example.png)
 
-The optional measurement output issued by this test:
+The optional measurement/analysis output issued by this test:
 ````no_compile
 Running 'Quicksort a reversed vec' algorithm:
   Resetting: 3406857µs/+768.00MiB; Pass 1: 658484µs/76.29MiB; Pass 2: 1315255µs/152.59MiB

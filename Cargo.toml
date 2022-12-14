@@ -2,7 +2,7 @@
 name          = "big-o-test"
 version       = "0.2.5"
 edition       = "2021"
-description   = "Enforces a maximum `space` and `time` Algorithm Complexity on tests"
+description   = "Enforces a maximum `space` and `time` Algorithm Complexity when testing"
 keywords      = ["algorithm", "analysis", "Big-O", "notation", "performance"]
 categories    = ["development-tools", "development-tools::profiling", "development-tools::testing"]
 readme        = "README.md"

@@ -22,18 +22,18 @@ impl BigOAlgorithmComplexity {
             Self::ON2                 => "O(n²)",
             Self::BetweenON2AndON3    => "Worse than O(n²), but better than O(n³)",
             Self::ON3                 => "O(n³)",
-            Self::BetweenON3AndON4    => "Worse than O(n³), but better than O(n^4)",
-            Self::ON4                 => "O(n^4)",
-            Self::BetweenON4AndOkN    => "Worse than O(n^4), but better than O(k^n)",
-            Self::OkN                 => "O(k^n)",
-            Self::WorseThanExponential => "Worse than O(k^n)",
+            Self::BetweenON3AndON4    => "Worse than O(n³), but better than O(n⁴)",
+            Self::ON4                 => "O(n⁴)",
+            Self::BetweenON4AndOkN    => "Worse than O(n⁴), but better than O(kⁿ)",
+            Self::OkN                 => "O(kⁿ)",
+            Self::WorseThanExponential => "Worse than O(kⁿ)",
         }
     }
     /// same as [as_pretty_str()], with additional info for time analysis
     pub fn as_time_pretty_str(&self) -> &'static str {
         match self {
             Self::BetterThanO1      => "Better than O(1) -- aren't the machines idle? too many threads? too little RAM?",
-            Self::WorseThanExponential => "Worse than Exponential!! -- worse than O(k^n) -- really, really bad algorithm, too short execution times or is there a hidden bug?",
+            Self::WorseThanExponential => "Worse than Exponential!! -- worse than O(kⁿ) -- really, really bad algorithm, too short execution times or is there a hidden bug?",
             _ => self.as_pretty_str(),
         }
     }
@@ -41,7 +41,7 @@ impl BigOAlgorithmComplexity {
     pub fn as_space_pretty_str(&self) -> &'static str {
         match self {
             Self::BetterThanO1      => "Better than O(1) -- are initialization allocations involved? Consider using a warm up pass",
-            Self::WorseThanExponential => "Worse than Exponential!! -- worse than O(k^n) -- really, really bad algorithm or is there a hidden bug?",
+            Self::WorseThanExponential => "Worse than Exponential!! -- worse than O(kⁿ) -- really, really bad algorithm or is there a hidden bug?",
             _ => self.as_pretty_str(),
         }
     }
