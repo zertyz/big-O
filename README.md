@@ -118,10 +118,10 @@ ctor = "0.1"
 big-o-test = "0.2"
 ````
 
-Then create an Integration Test, setting it up to execute tests linearly -- see `tests/big_o_tests.rs` for an example
+Then create an Integration Test, setting it up to execute tests linearly (using a single thread) -- see `tests/big_o_tests.rs` for an example
 on how this may be easily achieved.
 
-Disabling the Rust's default Parallel Test Runner is crucial for accurately measuring time & memory -- nonetheless,
+Note that disabling the Rust's default Parallel Test Runner is crucial for accurately measuring time & memory -- nonetheless,
 special care was taken to avoid flaky tests: an automatic retrying mechanism kicks in when the time complexity analysis
 doesn't match the maximum accepted value.
 
