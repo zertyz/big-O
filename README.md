@@ -14,7 +14,7 @@
 _RAM & CPU profiling in tests_
 
 The `big-O-test` crate dynamically analyzes algorithms for *space* and *time* resource consumption, allowing tests to enforce a maximum
-complexity -- preventing unnoticed performance regressions from making it to your main branch..
+complexity -- preventing unnoticed performance regressions from making it to your main branch.
 
 Browse the [Docs][docsrs].
 
