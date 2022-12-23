@@ -11,7 +11,7 @@
 [![big-o-test on crates.io][cratesio-image]][cratesio]
 [![big-o-test on docs.rs][docsrs-image]][docsrs]
 
-_Algorithms RAM & CPU profiling in tests_
+_RAM & CPU profiling in tests_
 
 The `big-O-test` crate dynamically analyzes algorithms for *space* and *time* resource consumption, allowing tests to enforce a maximum
 complexity -- preventing unnoticed performance regressions from making it to your main branch..
