@@ -33,7 +33,7 @@ Furthermore, this crate is specially useful to analyse complex algorithms on com
 analysis is impossible to be done: a carefully crafted *Big O Performance Test* is able to investigate/enforce what inputs make up the
 worse acceptable performance case, best case and how, on average, the algorithm should perform on excerpts of *real data*.
 
-This crate is, thus, meant to work as a *development tool*, alongside with *tests* & *benchmarks*.
+This crate is, thus, meant to work as a *profiling* / *development tool*, alongside with *tests* & *benchmarks*.
 
 A distinction is made between regular, non-iterator Algorithms and Iterator Algorithms.
 The latter encompasses algorithms that operate on a single element per call, which
