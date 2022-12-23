@@ -29,16 +29,14 @@ rand = "0.8"            # used by some tests to avoid call cancellation optimiza
 
 
 [features]
-dox = []
+
 
 [package.metadata.docs.rs]
-all-features = true
-# enable `dox feature in the documentation, so test docs are built
-rustdoc-args = ["--cfg", "dox"]
+rustdoc-args = ["--document-private-items"]	# enables full documentation (including test modules and test cases)
 
 
 # DOCUMENTATION
-# cargo doc --workspace --no-deps --document-private-items --features=dox
+# cargo doc --workspace --no-deps --document-private-items
 
 # DEPENDENCIES (crates)
 # cargo depgraph --all-features | dot -x -Tsvg -o dependencies.svg
