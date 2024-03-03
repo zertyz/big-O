@@ -18,7 +18,7 @@ license       = "Unlicense"
 
 [dependencies]
 crossbeam = "0.8"   # scoped threads
-keen-retry = "0.3"      # for automatic retries on flaky execution passes
+keen-retry = "0.4"      # for automatic retries on flaky execution passes
 
 
 [dev-dependencies]      # dev dependencies should become normal dependencies when building docs for tests
