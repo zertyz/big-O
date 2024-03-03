@@ -1,6 +1,6 @@
 [package]
 name          = "big-o-test"
-version       = "0.2.8"
+version       = "0.2.9"
 edition       = "2021"
 description   = "Enforces a maximum `space` and `time` Algorithm Complexity when testing"
 keywords      = ["algorithm", "analysis", "Big-O", "notation", "performance"]
