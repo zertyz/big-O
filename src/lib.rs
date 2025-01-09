@@ -5,6 +5,7 @@ pub mod runners;
 pub mod low_level_analysis;
 pub mod metrics_allocator;
 mod features;
+mod api;
 
 // exported symbols
 pub use {

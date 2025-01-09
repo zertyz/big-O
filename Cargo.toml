@@ -38,6 +38,7 @@ no_allocator_metrics = []      # If you don't want to change the global allocato
 
 
 [dependencies]
+tokio     = { version = "1", features = ["rt", "time", "macros"] }
 crossbeam = "0.8"                                  # scoped threads
 keen-retry = "0.5"                                 # for automatic retries on flaky execution passes
 
