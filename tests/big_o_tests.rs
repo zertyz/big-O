@@ -61,7 +61,7 @@ fn quick_sort_reversed_vec() {
 /// Attests the best case CRUD for vectors -- Create, Read, Update and Delete... all O(1):
 ///   - inserts at the end (push)
 ///   - deletes at the end (pop)
-#[cfg_attr(not(feature = "dox"), test)]
+#[test]
 fn vec_best_case_algorithm_analysis() {
     let iterations_per_pass: u32 = 250_000 * LOOP_MULTIPLIER;
     let n_threads = 1;
@@ -100,7 +100,7 @@ fn vec_best_case_algorithm_analysis() {
 ///   - Create always at the beginning -- O(n)
 ///   - Delete always at the beginning -- O(n)
 ///   - Reads and updates as the usual O(1)
-#[cfg_attr(not(feature = "dox"), test)]
+#[test]
 fn vec_worst_case_algorithm_analysis() {
     let iterations_per_pass: u32 = 16_384 * std::cmp::min(2, LOOP_MULTIPLIER);
     let n_threads = 1;
@@ -139,7 +139,7 @@ fn vec_worst_case_algorithm_analysis() {
 }
 
 /// Attests O(1) performance characteristics for HashMaps
-#[cfg_attr(not(feature = "dox"), test)]
+#[test]
 fn hashmap_algorithm_analysis() {
     let iterations_per_pass = 30_000 * LOOP_MULTIPLIER;
     let n_threads = 1;

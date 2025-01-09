@@ -70,13 +70,13 @@ pub fn analyse_time_complexity_for_set_resizing_iterator_algorithm<ScalarTimeUni
     analyse_set_resizing_iterator_complexity(t1, t2, n)
 }
 
-#[cfg(any(test, feature="dox"))]
+#[cfg(test)]
 mod tests {
 
     //! Unit tests for [time_analysis](super) module
 
     use super::*;
-    use crate::configs::*;
+    use crate::features::*;
     use serial_test::serial;
 
 

@@ -72,14 +72,14 @@ pub fn analyse_set_resizing_iterator_complexity(u1: f64, u2: f64, n: f64) -> Big
 }
 
 
-#[cfg(any(test, feature="dox"))]
+#[cfg(test)]
 mod tests {
 
     //! Unit tests for [low_level_analysis](super) module -- using 'serial_test' crate in order to make time measurements more reliable.
 
     use super::*;
     use crate::{
-        configs::{OUTPUT},
+        features::{OUTPUT},
         low_level_analysis::{
             types::{
                 BigOIteratorAlgorithmType,
@@ -137,7 +137,7 @@ mod tests {
 
 
     /// tests time & space complexity analysis on real constant set algorithms
-    #[cfg_attr(not(feature = "dox"), test)]
+    #[test]
     #[serial]
     fn analyse_constant_set_algorithm_real_test() {
 
@@ -248,7 +248,7 @@ mod tests {
     }
 
     /// tests time & space complexity analysis on real set resizing algorithms
-    #[cfg_attr(not(feature = "dox"), test)]
+    #[test]
     #[serial]
     fn analyse_set_resizing_algorithm_real_test() {
 

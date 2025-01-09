@@ -96,7 +96,14 @@ pub struct MetricsAllocator<'a, const RING_BUFFER_SIZE: usize> {
     statistics:              MetricsAllocatorStatistics<AtomicUsize>,
     used_memory_ring_buffer: RingBuffer<SavePointRingBufferSlot<usize>, RING_BUFFER_SIZE>,
 }
-impl<'a, const RING_BUFFER_SIZE: usize> MetricsAllocator<'a, RING_BUFFER_SIZE> {
+impl<const RING_BUFFER_SIZE: usize>
+Default
+for MetricsAllocator<'_, RING_BUFFER_SIZE> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl<const RING_BUFFER_SIZE: usize> MetricsAllocator<'_, RING_BUFFER_SIZE> {
 
     /// Creates an instance capable of replacing the Global Allocator.\
     /// See [super] for more info.
@@ -248,7 +255,7 @@ impl<'a, const RING_BUFFER_SIZE: usize> MetricsAllocator<'a, RING_BUFFER_SIZE> {
 }
 
 /// the global allocator
-unsafe impl<'a, const RING_BUFFER_SIZE: usize> GlobalAlloc for MetricsAllocator<'a, RING_BUFFER_SIZE> {
+unsafe impl<const RING_BUFFER_SIZE: usize> GlobalAlloc for MetricsAllocator<'_, RING_BUFFER_SIZE> {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         self.compute_alloc_metrics(&layout);
         self.system_allocator.alloc(layout)
@@ -268,7 +275,7 @@ unsafe impl<'a, const RING_BUFFER_SIZE: usize> GlobalAlloc for MetricsAllocator<
 }
 
 
-#[cfg(any(test, feature="dox"))]
+#[cfg(test)]
 mod tests {
 
     //! Unit tests for [metrics_allocator](super) module
@@ -277,9 +284,9 @@ mod tests {
 
 
     /// the same code used in [metrics_allocator](super) module docs
-    #[cfg_attr(not(feature = "dox"), test)]
+    #[test]
     fn usage_example() {
-        use crate::configs::ALLOC;
+        use crate::features::ALLOC;
         let save_point = ALLOC.save_point();
         let _vec = Vec::<u32>::with_capacity(1024);
         let metrics = ALLOC.delta_statistics(&save_point);
@@ -288,7 +295,7 @@ mod tests {
 
     /// uses the metrics computation functions to simulate a bunch of allocations / de-allocations,
     /// checking the [save_point()](MetricsAllocator::save_point()) and [delta_statistics()](MetricsAllocator::delta_statistics())  results
-    #[cfg_attr(not(feature = "dox"), test)]
+    #[test]
     fn test_save_point_min_and_max_memory_usage() {
         let allocator = MetricsAllocator::<16>::new();
         let mut used_mem = 0usize;

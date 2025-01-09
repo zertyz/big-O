@@ -1,7 +1,7 @@
 //! Contains code shared between this module's submodules
 
 use crate::{
-    configs,
+    features,
     low_level_analysis::types::*,
 };
 use std::{
@@ -13,15 +13,16 @@ use std::{
 /// wrap around the original [run_iterator_pass()] to output progress & intermediate results
 pub fn run_iterator_pass_verbosely<'a, _IteratorAlgorithmClosure: Fn(u32) -> u32 + Sync,
                                        _OutputClosure:            FnMut(&str),
-                                       T: TryInto<u64> + Copy> (result_prefix:      &str,
-                                                                result_suffix:      &str,
-                                                                iterator_algorithm: &_IteratorAlgorithmClosure,
-                                                                algorithm_type:     &BigOIteratorAlgorithmType,
-                                                                range:              Range<u32>,
-                                                                time_unit:          &'a TimeUnit<T>,
-                                                                threads:            u32,
-                                                                mut output:         _OutputClosure)
-                                                                -> (PassResult<'a,T>, u32) {
+                                       T: TryInto<u64> + Copy>
+                                  (result_prefix:      &str,
+                                   result_suffix:      &str,
+                                   iterator_algorithm: &_IteratorAlgorithmClosure,
+                                   algorithm_type:     &BigOIteratorAlgorithmType,
+                                   range:              Range<u32>,
+                                   time_unit:          &'a TimeUnit<T>,
+                                   threads:            u32,
+                                   mut output:         _OutputClosure)
+                                  -> (PassResult<'a,T>, u32) {
     let (pass_result, r) = run_iterator_pass(iterator_algorithm, algorithm_type, range, time_unit, threads);
     output(&format!("{}{}/{}{}", result_prefix, pass_result.time_measurements, pass_result.space_measurements, result_suffix));
     (pass_result, r)
@@ -29,12 +30,13 @@ pub fn run_iterator_pass_verbosely<'a, _IteratorAlgorithmClosure: Fn(u32) -> u32
 
 /// wrap around the original [run_pass()] to output progress & intermediate results
 pub fn run_pass_verbosely<'a, _OutputClosure:    FnMut(&str),
-                              T: TryInto<u64> + Copy> (result_prefix:  &str,
-                                                       result_suffix:  &str,
-                                                       algorithm:      impl FnMut() -> u32,
-                                                       time_unit:      &'a TimeUnit<T>,
-                                                       mut output:     _OutputClosure)
-                                                      -> (PassResult<'a,T>, u32) {
+                              T: TryInto<u64> + Copy>
+                         (result_prefix:  &str,
+                          result_suffix:  &str,
+                          algorithm:      impl FnMut() -> u32,
+                          time_unit:      &'a TimeUnit<T>,
+                          mut output:     _OutputClosure)
+                         -> (PassResult<'a,T>, u32) {
     let (pass_result, r) = run_pass(algorithm, time_unit);
     output(&format!("{}{}/{}{}", result_prefix, pass_result.time_measurements, pass_result.space_measurements, result_suffix));
     (pass_result, r)
@@ -53,12 +55,13 @@ pub fn run_pass_verbosely<'a, _OutputClosure:    FnMut(&str),
 /// ```
 /// returns: tuple with ([PassResult], computed_number: u32)
 pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync,
-                                    _ScalarDuration:   TryInto<u64> + Copy> (iterator_algorithm: &_AlgorithmClosure,
-                                                                             algorithm_type:     &BigOIteratorAlgorithmType,
-                                                                             range:              Range<u32>,
-                                                                             time_unit:          &'a TimeUnit<_ScalarDuration>,
-                                                                             threads:            u32)
-                                                                             -> (PassResult<'a,_ScalarDuration>, u32) {
+                                    _ScalarDuration:   TryInto<u64> + Copy>
+                               (iterator_algorithm: &_AlgorithmClosure,
+                                algorithm_type:     &BigOIteratorAlgorithmType,
+                                range:              Range<u32>,
+                                time_unit:          &'a TimeUnit<_ScalarDuration>,
+                                threads:            u32)
+                               -> (PassResult<'a,_ScalarDuration>, u32) {
 
     type ThreadLoopResult = (Duration, u32);
 
@@ -108,7 +111,7 @@ pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync,
         let i32_range = range.end as i32 .. range.start as i32;
         let chunk_size = (i32_range.end-i32_range.start)/threads as i32;
         let mut thread_handlers: Vec<crossbeam::thread::ScopedJoinHandle<ThreadLoopResult>> = Vec::with_capacity(threads as usize);
-        let allocator_savepoint = configs::ALLOC.save_point();
+        let allocator_savepoint = features::ALLOC.save_point();
         for n in 0..threads as i32 {
             let chunked_range = i32_range.start+chunk_size*n..i32_range.start+chunk_size*(n+1);
             thread_handlers.push( scope.spawn(move |_| thread_loop(iterator_algorithm, algorithm_type, chunked_range.start as u32 .. chunked_range.end as u32)) );
@@ -128,7 +131,7 @@ pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync,
             r ^= thread_r;
         }
 
-        let allocator_statistics = configs::ALLOC.delta_statistics(&allocator_savepoint);
+        let allocator_statistics = features::ALLOC.delta_statistics(&allocator_savepoint);
 
         (PassResult {
             time_measurements:  BigOTimePassMeasurements {
@@ -156,16 +159,17 @@ pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync,
 ///     fn algorithm() -> u32 {0}
 /// ```
 /// returns: tuple with ([PassResult]], computed_number: u32)
-pub(crate) fn run_pass<'a, _ScalarDuration:   TryInto<u64> + Copy> (mut algorithm:  impl FnMut() -> u32,
-                                                                    time_unit:      &'a TimeUnit<_ScalarDuration>)
-                                                                   -> (PassResult<'a,_ScalarDuration>, u32) {
+pub(crate) fn run_pass<_ScalarDuration:   TryInto<u64> + Copy>
+                      (mut algorithm:  impl FnMut() -> u32,
+                       time_unit:      &TimeUnit<_ScalarDuration>)
+                      -> (PassResult<'_, _ScalarDuration>, u32) {
 
-    let allocator_savepoint = configs::ALLOC.save_point();
+    let allocator_savepoint = features::ALLOC.save_point();
     let start = SystemTime::now();
     let r = algorithm();
     let duration = start.elapsed().unwrap();
     let elapsed = (time_unit.duration_conversion_fn_ptr)(&duration).try_into().unwrap_or_default();
-    let allocator_statistics = configs::ALLOC.delta_statistics(&allocator_savepoint);
+    let allocator_statistics = features::ALLOC.delta_statistics(&allocator_savepoint);
 
     (PassResult {
         time_measurements:  BigOTimePassMeasurements {
@@ -192,7 +196,7 @@ impl<ScalarTimeUnit: Copy> Default for PassResult<'_,ScalarTimeUnit> {
         Self {
             time_measurements: BigOTimePassMeasurements {
                 elapsed_time: 0,
-                time_unit: &TimeUnits::get_const_default(),
+                time_unit: TimeUnits::get_const_default(),
             },
             space_measurements: BigOSpacePassMeasurements {
                 used_memory_before: 0,

@@ -26,6 +26,14 @@ pub struct RingBuffer<Slot, const RING_BUFFER_SIZE: usize> {
     buffer: MaybeUninit<[Slot; RING_BUFFER_SIZE]>,
 }
 
+impl<Slot, const RING_BUFFER_SIZE: usize>
+Default
+for RingBuffer<Slot, RING_BUFFER_SIZE> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<Slot, const RING_BUFFER_SIZE: usize> RingBuffer<Slot, RING_BUFFER_SIZE> {
 
     pub const fn new() -> Self {
@@ -40,7 +48,7 @@ impl<Slot, const RING_BUFFER_SIZE: usize> RingBuffer<Slot, RING_BUFFER_SIZE> {
     pub fn consumer(&self) -> RingBufferConsumer<'_, Slot, RING_BUFFER_SIZE> {
         RingBufferConsumer {
             head: AtomicU32::new(self.published_tail.load(Ordering::Relaxed)),
-            ring_buffer: &self,
+            ring_buffer: self,
         }
     }
 
@@ -97,7 +105,7 @@ pub struct RingBufferConsumer<'a, Slot, const RING_BUFFER_SIZE: usize> {
     head: AtomicU32,
     ring_buffer: &'a RingBuffer<Slot, RING_BUFFER_SIZE>,
 }
-impl<'a, Slot, const RING_BUFFER_SIZE: usize> RingBufferConsumer<'a, Slot, RING_BUFFER_SIZE> {
+impl<Slot, const RING_BUFFER_SIZE: usize> RingBufferConsumer<'_, Slot, RING_BUFFER_SIZE> {
 
     /// Zero-copy dequeueing -- returns a reference to the ring-buffer slot containing the dequeued element.
     /// Please note a silent race condition may happen if the ring-buffer's enqueueing operation keeps happening
@@ -117,8 +125,7 @@ impl<'a, Slot, const RING_BUFFER_SIZE: usize> RingBufferConsumer<'a, Slot, RING_
             }
             match self.head.compare_exchange_weak(head, head + 1, Ordering::Acquire, Ordering::Relaxed) {
                 Ok(_) => unsafe {
-                    let const_ptr = self.ring_buffer.buffer.as_ptr();
-                    let ptr = const_ptr as *const [Slot; RING_BUFFER_SIZE];
+                    let ptr = self.ring_buffer.buffer.as_ptr();
                     let array = &*ptr;
                     if self.ring_buffer.reserved_tail.load(Ordering::Relaxed) - head > RING_BUFFER_SIZE as u32 {
                         return Err(RingBufferOverflowError { msg: format!("Ring-Buffer overflow: published_tail={}, head={} -- tail could not be farther from head than the ring buffer size of {}", published_tail, head, RING_BUFFER_SIZE) });
@@ -163,16 +170,14 @@ impl<'a, Slot, const RING_BUFFER_SIZE: usize> RingBufferConsumer<'a, Slot, RING_
         } else if head_index < published_tail_index {
             unsafe {
                 // sorcery to get back an array from a MaybeUninit using only const stable functions (as of Rust 1.55)
-                let const_ptr = self.ring_buffer.buffer.as_ptr();
-                let ptr = const_ptr as *const [Slot; RING_BUFFER_SIZE];
+                let ptr = self.ring_buffer.buffer.as_ptr();
                 let array = &*ptr;
                 Ok([&array[head_index .. published_tail_index], &[]])
             }
         } else {
             unsafe {
                 // sorcery to get back an array from a MaybeUninit using only const stable functions (as of Rust 1.55)
-                let const_ptr = self.ring_buffer.buffer.as_ptr();
-                let ptr = const_ptr as *const [Slot; RING_BUFFER_SIZE];
+                let ptr = self.ring_buffer.buffer.as_ptr();
                 let array = &*ptr;
                 Ok([&array[head_index..RING_BUFFER_SIZE], &array[0..published_tail_index]])
             }
@@ -205,7 +210,7 @@ impl From<RingBufferOverflowError> for std::io::Error {
 }
 
 
-#[cfg(any(test, feature="dox"))]
+#[cfg(test)]
 mod tests {
 
     //! Unit tests for [ring_buffer](super) module -- using 'serial_test' crate so not to interfere with time measurements from other modules.
@@ -217,7 +222,7 @@ mod tests {
 
 
     /// standard use cases assertions for our ring buffer
-    #[cfg_attr(not(feature = "dox"), test)]
+    #[test]
     fn simple_enqueue_dequeue_use_cases() {
         let ring_buffer = RingBuffer::<i32, 16>::new();
         let consumer = ring_buffer.consumer();
@@ -269,7 +274,7 @@ mod tests {
     }
 
     /// [RingBufferConsumer::peek_all()] specification & assertions
-    #[cfg_attr(not(feature = "dox"), test)]
+    #[test]
     fn peek() -> Result<(), RingBufferOverflowError> {
         let ring_buffer = RingBuffer::<u32, 16>::new();
         let consumer = ring_buffer.consumer();
@@ -318,7 +323,7 @@ mod tests {
     }
 
     /// ensures enqueueing can take place unharmed, but dequeueing & peek_all are prevented (with a meaningful error message) when buffer overflows happens
-    #[cfg_attr(not(feature = "dox"), test)]
+    #[test]
     #[serial]                 // needed since considerable RAM is used (which may interfere with 'crud_analysis.rs' tests)
     fn buffer_overflowing() {
         let ring_buffer = RingBuffer::<i32, 16>::new();
@@ -351,7 +356,7 @@ mod tests {
 
     /// uses varying number of threads for both enqueue / dequeue operations and performs all-in / all-out as well as single-in / single-out tests,
     /// asserting the dequeued element sums are always correct
-    #[cfg_attr(not(feature = "dox"), test)]
+    #[test]
     #[serial]
     fn concurrency() {
         let ring_buffer = RingBuffer::<u32, 40960>::new();

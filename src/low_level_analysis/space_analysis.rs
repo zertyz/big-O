@@ -32,6 +32,7 @@ pub fn analyse_space_complexity(passes_info:  &AlgorithmPassesInfo,
 ///   - O(1) for functions that do not use ram at all (or that use a const amount, regardless of the set size), like uncached reads / updates
 ///   - O(log(n)) for recursive binary searches and the like
 ///   - O(n) if caching takes place for reads / updates
+///
 /// See [analyse_space_complexity_for_set_resizing_iterator_algorithm()] for iterator algorithms that resize the data set they operate on.
 pub fn analyse_space_complexity_for_constant_set_iterator_algorithm(passes_info:  &ConstantSetIteratorAlgorithmPassesInfo,
                                                                     measurements: &BigOSpaceMeasurements) -> BigOAlgorithmComplexity {
@@ -56,6 +57,7 @@ pub fn analyse_space_complexity_for_constant_set_iterator_algorithm(passes_info:
 ///     binary tree for the vector elements -- to allow fast searches while keeping the traversal order (to match insertion order)
 ///   - O(n) for wired algorithms where each new inserted (n+1) element cause another (n) or even (n+1) elements to be insert as well.
 ///     Example: increment by 1 both chess board dimensions. board(n) will become board(n+1): 1+2*n elements are added. O(n) memory consumption.
+///
 /// See [analyse_space_complexity_for_constant_set_iterator_algorithm()] for non-iterator algorithms and for iterator algorithms that operate on a constant set.
 pub fn analyse_space_complexity_for_set_resizing_iterator_algorithm(passes_info:  &SetResizingIteratorAlgorithmPassesInfo,
                                                                     measurements: &BigOSpaceMeasurements) -> BigOAlgorithmComplexity {
@@ -69,7 +71,7 @@ pub fn analyse_space_complexity_for_set_resizing_iterator_algorithm(passes_info:
     analyse_set_resizing_iterator_complexity(s1, s2, n)
 }
 
-#[cfg(any(test, feature="dox"))]
+#[cfg(test)]
 mod tests {
 
     //! Unit tests for [space_analysis](super) module

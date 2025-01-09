@@ -60,12 +60,12 @@ impl<T: BigOAlgorithmMeasurements> Display for BigOAlgorithmAnalysis<T> {
 }
 
 
-impl<'a, ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for AlgorithmMeasurements<'a, ScalarTimeUnit> {
+impl<ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for AlgorithmMeasurements<'_, ScalarTimeUnit> {
     fn space_measurements(&self) -> &BigOSpaceMeasurements {
         &self.space_measurements
     }
 }
-impl<'a, ScalarTimeUnit: Copy> Display for AlgorithmMeasurements<'a, ScalarTimeUnit> {
+impl<ScalarTimeUnit: Copy> Display for AlgorithmMeasurements<'_, ScalarTimeUnit> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let pass_1_time  = format!("{}", self.time_measurements.pass_1_measurements);
         let pass_2_time  = format!("{}", self.time_measurements.pass_2_measurements);
@@ -92,12 +92,12 @@ impl<'a, ScalarTimeUnit: Copy> Display for AlgorithmMeasurements<'a, ScalarTimeU
 }
 
 
-impl<'a, ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for ConstantSetIteratorAlgorithmMeasurements<'a, ScalarTimeUnit> {
+impl<ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for ConstantSetIteratorAlgorithmMeasurements<'_, ScalarTimeUnit> {
     fn space_measurements(&self) -> &BigOSpaceMeasurements {
         &self.space_measurements
     }
 }
-impl<'a, ScalarTimeUnit: Copy> Display for ConstantSetIteratorAlgorithmMeasurements<'a, ScalarTimeUnit> {
+impl<ScalarTimeUnit: Copy> Display for ConstantSetIteratorAlgorithmMeasurements<'_, ScalarTimeUnit> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let pass_1_time  = format!("{}", self.time_measurements.pass_1_measurements);
         let pass_2_time  = format!("{}", self.time_measurements.pass_2_measurements);
@@ -120,12 +120,12 @@ impl<'a, ScalarTimeUnit: Copy> Display for ConstantSetIteratorAlgorithmMeasureme
 }
 
 
-impl<'a,ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for SetResizingIteratorAlgorithmMeasurements<'a,ScalarTimeUnit> {
+impl<ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for SetResizingIteratorAlgorithmMeasurements<'_, ScalarTimeUnit> {
     fn space_measurements(&self) -> &BigOSpaceMeasurements {
         &self.space_measurements
     }
 }
-impl<'a,ScalarTimeUnit: Copy> Display for SetResizingIteratorAlgorithmMeasurements<'a,ScalarTimeUnit> {
+impl<ScalarTimeUnit: Copy> Display for SetResizingIteratorAlgorithmMeasurements<'_, ScalarTimeUnit> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let pass_1_time  = format!("{}", self.time_measurements.pass_1_measurements);
         let pass_2_time  = format!("{}", self.time_measurements.pass_2_measurements);
@@ -161,11 +161,6 @@ impl BigOSpaceMeasurements {
     pub fn used_auxiliary_space(&self) -> usize {
         self.pass_2_measurements.max_used_memory - std::cmp::max(self.pass_2_measurements.used_memory_after, self.pass_2_measurements.used_memory_before) +
             self.pass_1_measurements.max_used_memory - std::cmp::max(self.pass_1_measurements.used_memory_after, self.pass_1_measurements.used_memory_before)
-    }
-}
-impl Default for BigOSpaceMeasurements {
-    fn default() -> Self {
-        Self { pass_1_measurements: BigOSpacePassMeasurements::default(), pass_2_measurements: BigOSpacePassMeasurements::default() }
     }
 }
 impl Display for BigOSpaceMeasurements {
@@ -215,16 +210,6 @@ impl Display for BigOSpacePassMeasurements {
         write!(f, "{}", self.fmt_over_n(1))
     }
 }
-impl Default for BigOSpacePassMeasurements {
-    fn default() -> Self {
-        Self {
-            used_memory_before: 0,
-            used_memory_after: 0,
-            max_used_memory: 0,
-            min_used_memory: 0,
-        }
-    }
-}
 
 
 impl<T> Default for TimeUnit<T> {
@@ -234,7 +219,7 @@ impl<T> Default for TimeUnit<T> {
 }
 
 
-#[cfg(any(test, feature="dox"))]
+#[cfg(test)]
 mod tests {
 
     //! Unit tests for [types_impl](super) submodule -- using 'serial_test' crate in order to make time measurements more reliable.
@@ -250,7 +235,7 @@ mod tests {
 
     /// assures serializations & implementors of *Display* from [types] work without panics
     /// -- also outputs them for manual inspection
-    #[cfg_attr(not(feature = "dox"), test)]
+    #[test]
     #[serial]
     fn serialization() {
         println!("BigOAlgorithmComplexity enum members, as strings:");

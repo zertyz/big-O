@@ -1,14 +1,14 @@
 #![doc = include_str!("../README.md")]
 
+
 pub mod runners;
 pub mod low_level_analysis;
 pub mod metrics_allocator;
-pub mod configs;
-
+mod features;
 
 // exported symbols
 pub use {
-    configs::{ALLOC, OUTPUT},
+    features::{ALLOC, OUTPUT},
     low_level_analysis::types::{
         BigOAlgorithmComplexity,
         TimeUnits,

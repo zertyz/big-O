@@ -4,7 +4,7 @@
 use std::time::Duration;
 use keen_retry::{loggable_retry_errors, ResolvedResult, RetryProducerResult, RetryResult};
 use crate::{
-    configs::{OUTPUT},
+    features::{OUTPUT},
     low_level_analysis::{
         self,
         types::{
@@ -59,7 +59,7 @@ pub fn test_algorithm<ScalarDuration: TryInto<u64> + Copy>
 /// Internal version of [test_algorithm()], allowing retries
 fn analyse_algorithm<ScalarDuration: TryInto<u64> + Copy>
                     (test_name:                 &str,
-                     mut reset_fn:              &mut impl FnMut(),
+                     reset_fn:                  &mut impl FnMut(),
                      pass1_set_size:            u32,
                      pass1_algorithm:           &mut impl FnMut() -> u32,
                      pass2_set_size:            u32,

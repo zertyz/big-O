@@ -122,13 +122,14 @@ pub struct BigOTimePassMeasurements<'a, ScalarTimeUnit> where ScalarTimeUnit: Cl
 }
 
 /// represents an algorithm's execution memory usage measurements for passes 1 & 2 -- in bytes
+#[derive(Default)]
 pub struct BigOSpaceMeasurements {
     pub pass_1_measurements: BigOSpacePassMeasurements,
     pub pass_2_measurements: BigOSpacePassMeasurements,
 }
 
 /// memory usage measurements, in bytes, for a pass execution
-#[derive(Debug,Clone,Copy)]
+#[derive(Debug,Clone,Copy,Default)]
 pub struct BigOSpacePassMeasurements {
     /// heap memory in use just before starting the pass execution
     pub used_memory_before: usize,
