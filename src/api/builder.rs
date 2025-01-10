@@ -1,24 +1,9 @@
 //! Defines our main API (using the Builder Pattern) & related internal model
 
-// big_o::analyse_regular_async_algorithm()
-//     .with_warmup(|| async {...})
-//     .with_max_reattempts_per_pass(2)
-//     .with_reset_fn(|| async {...})
-//     .first_pass(n_elements, |n_elements| async {...} -> data)
-//     .first_pass_assertions(|data| async {...})
-//     .second_pass(n_elements, |n_elements| async {...} -> data)
-//     .second_pass_assertions(|data| async {...})
-//     .with_time_measurements(BigOThings::On)
-//     .with_space_measurements(BigOThings::O1)
-//     .with_auxiliary_space_measurements(BigOThings::On)
-//     .add_custom_measurement("Δconn", BigOThing::O1, "total connections opened", ValueRepresentation::Unit, |data| ... -> val)
-//     .add_custom_measurement_with_averages("Δcalls", BigOThing::O1, "total external service calls made", ValueRepresentation::Scientific, |data| ... -> val)
-//     .run().await;
-
+use std::error::Error;
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
-use std::marker::PhantomData;
 use crate::BigOAlgorithmComplexity;
 
 /// TODO: really needed?
@@ -38,14 +23,29 @@ pub struct CustomMeasurement<MeasureFn> {
     pub measure_fn: MeasureFn,
 }
 
+/// TODO: to be left for another time.
+/// Errors that may happen when analysing the complexity of algorithms.
+/// Each enum variant specifies at which step the error happened and
+/// contain the original error returned by them.
+pub enum AlgorithmAnalysisError {
+    /// An error happened in the provided reset closure
+    ResetErr(Box<dyn Error + Send + Sync>),
+    /// An error happened in the provided closure to execute the "Warmup Pass" of the algorithm
+    WarmupErr(Box<dyn Error + Send + Sync>),
+    /// An error happened in the provided closure to execute the "First Pass" of the algorithm
+    FirstPassErr(Box<dyn Error + Send + Sync>),
+}
+
 // This struct accumulates all the config for the analysis
 pub struct RegularAsyncAnalyzerBuilder<FirstPassFn:   Fn(Option<ResetDataType>) -> FirstPassFut + Send + Sync,
                                        FirstPassFut:  Future<Output=PassDataType> + Send,
                                        ResetDataType: Debug,
                                        PassDataType:  Debug> {
+
+    reset_fn: Option<Box<dyn Fn(Option<PassDataType>) -> Pin<Box<dyn Future<Output=ResetDataType> + Send>> + Send + Sync>>,
+
     max_reattempts: Option<u32>,
     warmup_fn: Option<Box<dyn Fn(Option<ResetDataType>) -> Pin<Box<dyn Future<Output=PassDataType> + Send>> + Send + Sync>>,
-    reset_fn: Option<Box<dyn Fn(Option<PassDataType>) -> Pin<Box<dyn Future<Output=ResetDataType> + Send>> + Send + Sync>>,
 
     first_pass_n: u64,
     first_pass_fn: Option<FirstPassFn>,
@@ -152,9 +152,10 @@ RegularAsyncAnalyzerBuilder<FirstPassFn, FirstPassFut, ResetDataType, PassDataTy
 
     pub fn new() -> Self {
         Self {
+            reset_fn: None,
+
             warmup_fn: None,
             max_reattempts: None,
-            reset_fn: None,
 
             first_pass_n: 0,
             first_pass_fn: None,
@@ -463,18 +464,25 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn it_works() {
+    async fn full_options() {
         let s = RegularAsyncAnalyzerBuilder::new()
+            .with_reset_fn(|previous_pass_input| async move {
+                println!("Reset received input {previous_pass_input:?} -- and this is the Option<PassDataType>. We are returning ''");
+                'c'
+            })
             .warmup_pass(|reset_outcome| async move {
                 println!("Warmup received the reset_fn outcome as input: {reset_outcome:?} -- and this is the ResetDataType. We are returning 1");
                 1
             })
             .with_max_reattempts_per_pass(2)
-            .with_reset_fn(|previous_pass_input| async move {
-                println!("Reset received input {previous_pass_input:?} -- and this is the Option<PassDataType>. We are returning ''");
-                'c'
-            })
             .first_pass(100, |reset_outcome| async {2});
+        s.run().await;
+    }
+
+    #[tokio::test]
+    async fn minimum_options() {
+        let s = RegularAsyncAnalyzerBuilder::new()
+            .first_pass(100, |_: Option<()>| async {});
         s.run().await;
     }
 

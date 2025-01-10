@@ -33,10 +33,15 @@ big_o::analyse_regular_async_algorithm()
   .add_custom_measurement("Δconn", BigOThing::O1, "total connections opened", ValueRepresentation::Unit, |data| ... -> val)
   .add_custom_measurement_with_averages("Δcalls", BigOThing::O1, "total external service calls made", ValueRepresentation::Scientific, |data| ... -> val)
 ```
-Note both the builder and the runner might fail due to sanity check violations in addition to the provided assertions:
-a) n is the same for the 1st and 2nd passes -- or even smaller on the 2nd pass... or not "big enough"
-b) memory measurements are inconsistent between re-attempts (when the difference is "considerably large")
-c) the memory didn't return to the same value after everything was freed -- either a memory leak, caching or concurrent tests are running
+* Maybe an additional method may be provided to inform the time measurement function -- defaulting to `Instant::now()`
+* Since this is meant to be run in tests, the closures do not return a `Result<>`. Closures must panic if an error happen -- as tests do
+  -- by adding `.unwrap()` or `.expect()` to fallible operations.
+  (In the future we might provide the `try_*` variations for the closures, if this crate would ever be run outside tests).
+* Note both the builder and the runner might fail due to sanity check violations in addition to the provided assertions:
+  1) n is the same for the 1st and 2nd passes -- or even smaller on the 2nd pass... or not "big enough"
+  2) no measurements were specified -- no time, space, auxiliary space nor any custom measurements 
+  3) memory measurements are inconsistent between re-attempts (when the difference is "considerably large")
+  4) the memory didn't return to the same value after everything was freed -- either a memory leak, caching or concurrent tests are running
 
 
 # Backlog
