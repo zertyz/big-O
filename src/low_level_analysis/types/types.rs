@@ -29,7 +29,7 @@ pub enum BigOAlgorithmComplexity {
     WorseThanExponential,
 }
 
-/// Specifies if the iterator algorithm under analysis alters the data set it works on or if it has no side-effects on it.\
+/// Specifies if the iterator algorithm under analysis alters the data set it works on or if it has no side effects on it.\
 /// Different math applies on each case, as well as different parameters to the iterator function required by the [crate::runner].
 /// The "Iterator Algorithms" term is used in this crate to distinguish them from "Standard Algorithms". They differ in the sense
 /// that Iterator Algorithms operate on a single element at a time (from a rather huge set) -- and, as said, different math applies

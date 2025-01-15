@@ -1,11 +1,12 @@
 #![doc = include_str!("../README.md")]
 
 
+pub mod api;
 pub mod runners;
 pub mod low_level_analysis;
 pub mod metrics_allocator;
 mod features;
-mod api;
+pub(crate) mod utils;
 
 // exported symbols
 pub use {

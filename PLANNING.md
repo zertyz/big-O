@@ -37,6 +37,7 @@ big_o::analyse_regular_async_algorithm()
 * Since this is meant to be run in tests, the closures do not return a `Result<>`. Closures must panic if an error happen -- as tests do
   -- by adding `.unwrap()` or `.expect()` to fallible operations.
   (In the future we might provide the `try_*` variations for the closures, if this crate would ever be run outside tests).
+  (If this would ever happen, please see commit 0ff3a232dda13cb2752e872bb7f1ed8bca1dd1b4:src/api/builder.rs:26).
 * Note both the builder and the runner might fail due to sanity check violations in addition to the provided assertions:
   1) n is the same for the 1st and 2nd passes -- or even smaller on the 2nd pass... or not "big enough"
   2) no measurements were specified -- no time, space, auxiliary space nor any custom measurements 
