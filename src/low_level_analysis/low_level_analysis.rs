@@ -87,7 +87,6 @@ mod tests {
                 BigOTimeMeasurements, BigOSpaceMeasurements,
                 ConstantSetIteratorAlgorithmPassesInfo, SetResizingIteratorAlgorithmPassesInfo,
                 ConstantSetIteratorAlgorithmMeasurements, SetResizingIteratorAlgorithmMeasurements,
-                TimeUnit, TimeUnits
             },
             time_analysis::*,
             space_analysis::*
@@ -98,7 +97,7 @@ mod tests {
         time::{Duration},
     };
     use serial_test::serial;
-
+    use crate::low_level_analysis::types::BigOPassMeasurements;
 
     /// test algorithm complexity analysis progression when resource utilization increase for regular, non-iterator algorithms
     /// and for constant set iterator algorithms
@@ -144,7 +143,6 @@ mod tests {
         const REPETITIONS: u32 = 1024;
         const PASS_1_SET_SIZE: u32 = REPETITIONS;
         const PASS_2_SET_SIZE: u32 = REPETITIONS * 4;
-        const TIME_UNIT: &TimeUnit<u128> = &TimeUnits::MICROSECOND;
 
         fn o_1_select(mut _n: u32) -> u32 {
             // constant element allocation & single operation processing
@@ -190,9 +188,9 @@ mod tests {
         let analyze = |measurement_name, select_function: fn(u32) -> u32| {
             OUTPUT(&format!("Real '{}', fetching {} elements on each pass ", measurement_name, REPETITIONS));
 
-            let (_warmup_result               , r1) = run_iterator_pass_verbosely("(warmup: ", "",    &select_function, &BigOIteratorAlgorithmType::ConstantSet, 0 .. REPETITIONS, TIME_UNIT, 1, OUTPUT);
-            let (pass_1_result, r2) = run_iterator_pass_verbosely("; pass1: ", "",    &select_function, &BigOIteratorAlgorithmType::ConstantSet, 0 .. PASS_1_SET_SIZE, TIME_UNIT, 1, OUTPUT);
-            let (pass_2_result, r3) = run_iterator_pass_verbosely("; pass2: ", "): ", &select_function, &BigOIteratorAlgorithmType::ConstantSet, PASS_2_SET_SIZE - REPETITIONS .. PASS_2_SET_SIZE, TIME_UNIT, 1, OUTPUT);
+            let (_warmup_result               , r1) = run_iterator_pass_verbosely("(warmup: ", "",    &select_function, &BigOIteratorAlgorithmType::ConstantSet, 0 .. REPETITIONS, 1, OUTPUT);
+            let (pass_1_result, r2) = run_iterator_pass_verbosely("; pass1: ", "",    &select_function, &BigOIteratorAlgorithmType::ConstantSet, 0 .. PASS_1_SET_SIZE, 1, OUTPUT);
+            let (pass_2_result, r3) = run_iterator_pass_verbosely("; pass2: ", "): ", &select_function, &BigOIteratorAlgorithmType::ConstantSet, PASS_2_SET_SIZE - REPETITIONS .. PASS_2_SET_SIZE, 1, OUTPUT);
 
             let constant_set_passes_info = ConstantSetIteratorAlgorithmPassesInfo {
                 pass_1_set_size: PASS_1_SET_SIZE,
@@ -219,8 +217,18 @@ mod tests {
                 algorithm_measurements: ConstantSetIteratorAlgorithmMeasurements {
                     measurement_name,
                     passes_info: constant_set_passes_info,
+                    pass1_measurements: BigOPassMeasurements {
+                        time_measurements: time_measurements.pass_1_measurements,
+                        space_measurements: space_measurements.pass_1_measurements,
+                        custom_measurements: vec![],
+                    },
+                    pass2_measurements: BigOPassMeasurements {
+                        time_measurements: time_measurements.pass_2_measurements,
+                        space_measurements: space_measurements.pass_2_measurements,
+                        custom_measurements: vec![],
+                    },
                     time_measurements,
-                    space_measurements
+                    space_measurements,
                 },
             };
 
@@ -289,10 +297,10 @@ mod tests {
             OUTPUT(&format!("Real '{}' with {} elements on each pass ", measurement_name, DELTA_SET_SIZE));
 
             /* warmup pass -- container / database should be reset before and after this */
-            let (_warmup_result,                r1) = run_iterator_pass_verbosely("(warmup: ", "", &insert_function, &BigOIteratorAlgorithmType::SetResizing, 0 .. DELTA_SET_SIZE, &TimeUnits::MICROSECOND, 1, OUTPUT);
+            let (_warmup_result,                r1) = run_iterator_pass_verbosely("(warmup: ", "", &insert_function, &BigOIteratorAlgorithmType::SetResizing, 0 .. DELTA_SET_SIZE, 1, OUTPUT);
             /* if we were operating on real data, we would reset the container / database after the warmup, before running pass 1 */
-            let (pass_1_result, r2) = run_iterator_pass_verbosely("; pass1: ", "", &insert_function, &BigOIteratorAlgorithmType::SetResizing, 0 ..DELTA_SET_SIZE, &TimeUnits::MICROSECOND, 1, OUTPUT);
-            let (pass_2_result, r3) = run_iterator_pass_verbosely("; pass2: ", "): ", &insert_function, &BigOIteratorAlgorithmType::SetResizing, DELTA_SET_SIZE.. DELTA_SET_SIZE * 2, &TimeUnits::MICROSECOND, 1, OUTPUT);
+            let (pass_1_result, r2) = run_iterator_pass_verbosely("; pass1: ", "", &insert_function, &BigOIteratorAlgorithmType::SetResizing, 0 ..DELTA_SET_SIZE, 1, OUTPUT);
+            let (pass_2_result, r3) = run_iterator_pass_verbosely("; pass2: ", "): ", &insert_function, &BigOIteratorAlgorithmType::SetResizing, DELTA_SET_SIZE.. DELTA_SET_SIZE * 2, 1, OUTPUT);
 
             let set_resizing_passes_info = SetResizingIteratorAlgorithmPassesInfo { delta_set_size: DELTA_SET_SIZE };
 

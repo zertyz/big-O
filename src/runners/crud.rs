@@ -41,7 +41,7 @@ pub fn test_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
                             warmup_percentage: u32, create_iterations_per_pass: u32, read_iterations_per_pass: u32, update_iterations_per_pass: u32, delete_iterations_per_pass: u32,
                             create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32,
                             time_unit: &'a TimeUnit<TimeUnitType>)
-                           where PassResult<'a, TimeUnitType>: Copy {
+                           where PassResult: Copy {
 
     // adapts the 'iterations_per_pass' to the 'attempt' number, so each retry uses slightly different values
     fn adapt(attempt: u32, iterations_per_pass: u32) -> u32 {
@@ -169,12 +169,12 @@ pub fn analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
                                warmup_percentage: u32, create_iterations_per_pass: u32, read_iterations_per_pass: u32, update_iterations_per_pass: u32, delete_iterations_per_pass: u32,
                                create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32,
                                time_unit: &'a TimeUnit<TimeUnitType>)
-                              -> (Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a, TimeUnitType>> >,    // create analysis
-                                  Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a, TimeUnitType>> >,    // read analysis
-                                  Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a, TimeUnitType>> >,    // update analysis
-                                  Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a, TimeUnitType>> >,    // delete analysis
-                                  String)                                                                                         // the full report
-                              where PassResult<'a, TimeUnitType>: Copy {
+                              -> (Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a>> >,    // create analysis
+                                  Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a>> >,    // read analysis
+                                  Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a>> >,    // update analysis
+                                  Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a>> >,    // delete analysis
+                                  String)                                                                           // the full report
+                              where PassResult: Copy {
 
     internal_analyse_crud_algorithms(crud_name, reset_fn,
                                      create_fn,  BigOAlgorithmComplexity::WorseThanExponential,  BigOAlgorithmComplexity::WorseThanExponential,
@@ -219,13 +219,13 @@ fn internal_analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
                                     warmup_percentage: u32, create_iterations_per_pass: u32, read_iterations_per_pass: u32, update_iterations_per_pass: u32, delete_iterations_per_pass: u32,
                                     create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32,
                                     time_unit: &'a TimeUnit<TimeUnitType>)
-                                   -> Result<(Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a, TimeUnitType>> >,       // create analysis
-                                              Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a, TimeUnitType>> >,       // read analysis
-                                              Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a, TimeUnitType>> >,       // update analysis
-                                              Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a, TimeUnitType>> >,       // delete analysis
-                                              String),                                                                                           // full report
+                                   -> Result<(Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a>> >,       // create analysis
+                                              Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a>> >,       // read analysis
+                                              Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a>> >,       // update analysis
+                                              Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a>> >,       // delete analysis
+                                              String),                                                                             // full report
                                              CRUDComplexityAnalysisError>
-                                   where PassResult<'a, TimeUnitType>: Copy {
+                                   where PassResult: Copy {
 
     let mut full_report = String::with_capacity(2048);
 
@@ -235,10 +235,10 @@ fn internal_analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
         OUTPUT(msg);
     };
 
-    let mut create_passes_results = [PassResult::<TimeUnitType>::default(); NUMBER_OF_PASSES as usize];
-    let mut   read_passes_results = [PassResult::<TimeUnitType>::default(); NUMBER_OF_PASSES as usize];
-    let mut update_passes_results = [PassResult::<TimeUnitType>::default(); NUMBER_OF_PASSES as usize];
-    let mut delete_passes_results = [PassResult::<TimeUnitType>::default(); NUMBER_OF_PASSES as usize];
+    let mut create_passes_results = [PassResult::default(); NUMBER_OF_PASSES as usize];
+    let mut   read_passes_results = [PassResult::default(); NUMBER_OF_PASSES as usize];
+    let mut update_passes_results = [PassResult::default(); NUMBER_OF_PASSES as usize];
+    let mut delete_passes_results = [PassResult::default(); NUMBER_OF_PASSES as usize];
 
     const NUMBER_OF_PASSES: u32 = 2;
 
@@ -268,7 +268,7 @@ fn internal_analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
                 let (pass_result, pass_r) = run_iterator_pass_verbosely(&format!("{}: ", $operation_name.to_ascii_lowercase()), $suffix,
                                                                         &$algorithm_closure, &BigOIteratorAlgorithmType::SetResizing,
                                                                         calc_regular_cru_range($number_of_iterations_per_pass, $pass_number),
-                                                                        time_unit, $number_of_threads, &mut _output);
+                                                                        $number_of_threads, &mut _output);
                 $passes_results[$pass_number as usize] = pass_result;
                 r ^= pass_r;
                 if $pass_number == NUMBER_OF_PASSES-1 {
@@ -287,6 +287,17 @@ fn internal_analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
                             pass_1_measurements: $passes_results[0].space_measurements,
                             pass_2_measurements: $passes_results[1].space_measurements,
                         },
+                        pass1_measurements: $crate::low_level_analysis::types::BigOPassMeasurements {
+                            time_measurements: $passes_results[0].time_measurements,
+                            space_measurements: $passes_results[0].space_measurements,
+                            custom_measurements: vec![],
+                        },
+                        pass2_measurements: $crate::low_level_analysis::types::BigOPassMeasurements {
+                            time_measurements: $passes_results[1].time_measurements,
+                            space_measurements: $passes_results[1].space_measurements,
+                            custom_measurements: vec![],
+                        },
+
                     };
                     let  time_complexity = low_level_analysis::time_analysis::  analyse_time_complexity_for_constant_set_iterator_algorithm(&measurements.passes_info, &measurements.time_measurements);
                     let space_complexity = low_level_analysis::space_analysis::analyse_space_complexity_for_constant_set_iterator_algorithm(&measurements.passes_info, &measurements.space_measurements);
@@ -321,7 +332,7 @@ fn internal_analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
                 let (pass_result, pass_r) = run_iterator_pass_verbosely(&$result_prefix_closure($pass_number, $operation_name), $suffix,
                                                                         &$algorithm_closure, &BigOIteratorAlgorithmType::SetResizing,
                                                                         $range_fn($number_of_iterations_per_pass, $pass_number),
-                                                                        time_unit, $number_of_threads, &mut _output);
+                                                                        $number_of_threads, &mut _output);
                 $passes_results[$pass_number as usize] = pass_result;
                 r ^= pass_r;
                 if $pass_number == $last_pass_number {
@@ -437,22 +448,22 @@ fn internal_analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
         io::stdout().flush().unwrap();
         if create_iterations_per_pass > 0 {
             _output("C");
-            let (_elapse, warmup_r) = run_iterator_pass(&create_fn, &BigOIteratorAlgorithmType::SetResizing, calc_warmup_cru_range(create_iterations_per_pass), time_unit, create_threads);
+            let (_elapse, warmup_r) = run_iterator_pass(&create_fn, &BigOIteratorAlgorithmType::SetResizing, calc_warmup_cru_range(create_iterations_per_pass), create_threads);
             r ^= warmup_r;
         }
         if read_iterations_per_pass > 0 {
             _output("R");
-            let (_elapse, warmup_r) = run_iterator_pass(&read_fn, &BigOIteratorAlgorithmType::ConstantSet, calc_warmup_cru_range(read_iterations_per_pass), time_unit, read_threads);
+            let (_elapse, warmup_r) = run_iterator_pass(&read_fn, &BigOIteratorAlgorithmType::ConstantSet, calc_warmup_cru_range(read_iterations_per_pass), read_threads);
             r ^= warmup_r;
         }
         if update_iterations_per_pass > 0 {
             _output("U");
-            let (_elapse, warmup_r) = run_iterator_pass(&update_fn, &BigOIteratorAlgorithmType::ConstantSet, calc_warmup_cru_range(update_iterations_per_pass), time_unit, update_threads);
+            let (_elapse, warmup_r) = run_iterator_pass(&update_fn, &BigOIteratorAlgorithmType::ConstantSet, calc_warmup_cru_range(update_iterations_per_pass), update_threads);
             r ^= warmup_r;
         }
         if delete_iterations_per_pass > 0 {
             _output("D");
-            let (_elapse, warmup_r) = run_iterator_pass(&delete_fn, &BigOIteratorAlgorithmType::SetResizing, calc_warmup_d_range(delete_iterations_per_pass), time_unit, delete_threads);
+            let (_elapse, warmup_r) = run_iterator_pass(&delete_fn, &BigOIteratorAlgorithmType::SetResizing, calc_warmup_d_range(delete_iterations_per_pass), delete_threads);
             r ^= warmup_r;
         }
         _output("] ");

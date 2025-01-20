@@ -2,7 +2,8 @@
 //! See [super::types_impl] as well for implementations of the structs/enums defined here.
 
 use std::fmt::Display;
-
+use std::time::Duration;
+use crate::utils::measurements::measurer::CustomMeasurement;
 
 /// Possible time & space complexity analysis results, in big-O notation.
 /// Results are for a single operation -- remember a pass have several operations,
@@ -67,58 +68,61 @@ pub struct BigOAlgorithmAnalysis<T: BigOAlgorithmMeasurements> {
 /// Contains the measurements for regular, non-iterator algorithms, so that they may have their time & space complexities analysed\
 /// -- non-iterator algorithms: sort, fib, ...\
 /// For iterator algorithms, see [ConstantSetIteratorAlgorithmMeasurements] & [SetResizingIteratorAlgorithmMeasurements]
-pub struct AlgorithmMeasurements<'a, ScalarTimeUnit: Copy> {
+pub struct AlgorithmMeasurements<'a> {
     /// a name for these measurements, for presentation purposes
     pub measurement_name:   &'a str,
     /// run pass info
     pub passes_info:        AlgorithmPassesInfo,
     /// times measured for each pass run
-    pub time_measurements:  BigOTimeMeasurements<'a, ScalarTimeUnit>,
+    pub time_measurements:  BigOTimeMeasurements,
     /// allocations / de-allocations measured for each pass run
     pub space_measurements: BigOSpaceMeasurements,
+    ////////////////////////////
+    pub pass1_measurements: BigOPassMeasurements,
+    pub pass2_measurements: BigOPassMeasurements,
 }
 
 /// Contains the measurements for iterator algorithms that do not alter the data set size they operate on\
 /// -- such as select/update, get, ... \
 /// See also [SetResizingIteratorAlgorithmMeasurements] or, for non-iterator algorithms, [AlgorithmMeasurements]
-pub struct ConstantSetIteratorAlgorithmMeasurements<'a, ScalarTimeUnit: Copy> {
+pub struct ConstantSetIteratorAlgorithmMeasurements<'a> {
     /// a name for these measurements, for presentation purposes
     pub measurement_name:   &'a str,
     /// run pass info
     pub passes_info:        ConstantSetIteratorAlgorithmPassesInfo,
     /// times measured for each pass run
-    pub time_measurements:  BigOTimeMeasurements<'a, ScalarTimeUnit>,
+    pub time_measurements:  BigOTimeMeasurements,
     /// allocations / de-allocations measured for each pass run
     pub space_measurements: BigOSpaceMeasurements,
+    ////////////////////////////
+    pub pass1_measurements: BigOPassMeasurements,
+    pub pass2_measurements: BigOPassMeasurements,
+}
+
+pub struct BigOPassMeasurements {
+    pub time_measurements: Duration,
+    pub space_measurements: BigOSpacePassMeasurements,
+    pub custom_measurements: Vec<CustomMeasurement>,
 }
 
 /// Contains the measurements for iterator algorithms that change the data set size they operate on\
 /// -- such as insert/delete, enqueue/dequeue, push/pop, add/remove, ...
 /// See also [ConstantSetIteratorAlgorithmMeasurements] or, for non-iterator algorithms, [AlgorithmMeasurements]
-pub struct SetResizingIteratorAlgorithmMeasurements<'a, ScalarTimeUnit: Copy> {
+pub struct SetResizingIteratorAlgorithmMeasurements<'a> {
     /// a name for these measurements, for presentation purposes
     pub measurement_name: &'a str,
     /// run pass info
     pub passes_info:        SetResizingIteratorAlgorithmPassesInfo,
     /// times measured for each pass run
-    pub time_measurements:  BigOTimeMeasurements<'a, ScalarTimeUnit>,
+    pub time_measurements:  BigOTimeMeasurements,
     /// allocations / de-allocations measured for each pass run
     pub space_measurements: BigOSpaceMeasurements,
 }
 
 /// represents an algorithm's execution time measurements for passes 1 & 2
-pub struct BigOTimeMeasurements<'a, ScalarTimeUnit: Copy> {
-    pub pass_1_measurements: BigOTimePassMeasurements<'a, ScalarTimeUnit>,
-    pub pass_2_measurements: BigOTimePassMeasurements<'a ,ScalarTimeUnit>,
-}
-
-/// the elapsed time & unit taken to run one of the 2 passes for the algorithm
-#[derive(Clone,Copy)]
-pub struct BigOTimePassMeasurements<'a, ScalarTimeUnit> where ScalarTimeUnit: Clone+Copy {
-    /// the time it took to run
-    pub elapsed_time: u64,
-    /// precision/unit for the measurements
-    pub time_unit: &'a TimeUnit<ScalarTimeUnit>,
+pub struct BigOTimeMeasurements {
+    pub pass_1_measurements: Duration,
+    pub pass_2_measurements: Duration,
 }
 
 /// represents an algorithm's execution memory usage measurements for passes 1 & 2 -- in bytes

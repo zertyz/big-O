@@ -14,11 +14,11 @@ use crate::{
             AlgorithmMeasurements,
             BigOTimeMeasurements,
             BigOSpaceMeasurements,
-            TimeUnit},
+        },
     },
     runners::common::*
 };
-
+use crate::low_level_analysis::types::BigOPassMeasurements;
 
 /// TODO
 pub fn test_constant_set_iterator_algorithm() {}
@@ -38,11 +38,9 @@ pub fn test_algorithm<ScalarDuration: TryInto<u64> + Copy>
                       pass2_set_size:            u32,
                       mut pass2_algorithm:       impl FnMut() -> u32,
                       expected_time_complexity:  BigOAlgorithmComplexity,
-                      expected_space_complexity: BigOAlgorithmComplexity,
-                      time_unit:                 &TimeUnit<ScalarDuration>,
-                     ) {
-    let result = analyse_algorithm(test_name, &mut reset_fn, pass1_set_size, &mut pass1_algorithm, pass2_set_size, &mut pass2_algorithm, expected_time_complexity, expected_space_complexity, time_unit)
-        .retry_with(|_| analyse_algorithm(test_name, &mut reset_fn, pass1_set_size, &mut pass1_algorithm, pass2_set_size, &mut pass2_algorithm, expected_time_complexity, expected_space_complexity, time_unit))
+                      expected_space_complexity: BigOAlgorithmComplexity) {
+    let result = analyse_algorithm(test_name, &mut reset_fn, pass1_set_size, &mut pass1_algorithm, pass2_set_size, &mut pass2_algorithm, expected_time_complexity, expected_space_complexity)
+        .retry_with(|_| analyse_algorithm(test_name, &mut reset_fn, pass1_set_size, &mut pass1_algorithm, pass2_set_size, &mut pass2_algorithm, expected_time_complexity, expected_space_complexity))
         .with_delays((0..max_retry_attempts).map(|_| Duration::from_secs(5)));
     let failure_msg = match result {
         ResolvedResult::Ok { .. } => None,
@@ -57,22 +55,20 @@ pub fn test_algorithm<ScalarDuration: TryInto<u64> + Copy>
 }
 
 /// Internal version of [test_algorithm()], allowing retries
-fn analyse_algorithm<ScalarDuration: TryInto<u64> + Copy>
-                    (test_name:                 &str,
+fn analyse_algorithm(test_name:                 &str,
                      reset_fn:                  &mut impl FnMut(),
                      pass1_set_size:            u32,
                      pass1_algorithm:           &mut impl FnMut() -> u32,
                      pass2_set_size:            u32,
                      pass2_algorithm:           &mut impl FnMut() -> u32,
                      expected_time_complexity:  BigOAlgorithmComplexity,
-                     expected_space_complexity: BigOAlgorithmComplexity,
-                     time_unit:                 &TimeUnit<ScalarDuration>)
+                     expected_space_complexity: BigOAlgorithmComplexity)
                     -> RetryProducerResult<String, String> {
 
     OUTPUT(&format!("Running '{}' algorithm:\n", test_name));
-    let (_reset_pass_result,                   r0) = run_pass_verbosely("  Resetting: ", "", || {reset_fn(); 0}, time_unit, OUTPUT);
-    let (pass1_result, r1) = run_pass_verbosely("; Pass 1: ", "", pass1_algorithm, time_unit, OUTPUT);
-    let (pass2_result, r2) = run_pass_verbosely("; Pass 2: ", "", pass2_algorithm, time_unit, OUTPUT);
+    let (_reset_pass_result,                   r0) = run_pass_verbosely("  Resetting: ", "", || {reset_fn(); 0}, OUTPUT);
+    let (pass1_result, r1) = run_pass_verbosely("; Pass 1: ", "", pass1_algorithm, OUTPUT);
+    let (pass2_result, r2) = run_pass_verbosely("; Pass 2: ", "", pass2_algorithm, OUTPUT);
     let measurements = AlgorithmMeasurements {
         measurement_name: test_name,
         passes_info: AlgorithmPassesInfo {
@@ -86,6 +82,16 @@ fn analyse_algorithm<ScalarDuration: TryInto<u64> + Copy>
         space_measurements: BigOSpaceMeasurements {
             pass_1_measurements: pass1_result.space_measurements,
             pass_2_measurements: pass2_result.space_measurements,
+        },
+        pass1_measurements: BigOPassMeasurements {
+            time_measurements: pass1_result.time_measurements,
+            space_measurements: Default::default(),
+            custom_measurements: vec![],
+        },
+        pass2_measurements: BigOPassMeasurements {
+            time_measurements: Default::default(),
+            space_measurements: Default::default(),
+            custom_measurements: vec![],
         },
     };
     let observed_time_complexity  = low_level_analysis::time_analysis::analyse_time_complexity(&measurements.passes_info, &measurements.time_measurements);

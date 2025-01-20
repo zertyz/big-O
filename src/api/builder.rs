@@ -2,11 +2,9 @@
 
 use std::fmt::Debug;
 use std::future::Future;
-use std::marker::PhantomData;
 use std::pin::Pin;
 use crate::BigOAlgorithmComplexity;
-use crate::utils::measurements;
-use crate::utils::measurements::measurer::{measure_all_after_event, measure_all_before_event, Measurer, MeasurerExecutor};
+use crate::utils::measurements::measurer::{measure_all_after_event, measure_all_before_event, CustomMeasurement, CustomMeasurer, CustomMeasurerExecutor};
 use crate::utils::measurements::presentable_measurements::PresentableMeasurement;
 
 /// TODO: really needed?
@@ -15,14 +13,6 @@ pub enum ValueRepresentation {
     Unit,
     Scientific,
     // ...
-}
-
-// Could store additional info about a measurement
-pub struct CustomMeasurement<AlgoDataType: Send + Sync + Debug> {
-    pub name: String,
-    pub expected_complexity: BigOAlgorithmComplexity,
-    pub description: String,
-    pub measurer_executor: Box<dyn MeasurerExecutor<AlgoDataType>>,
 }
 
 // This struct accumulates all the config for the analysis
@@ -39,12 +29,12 @@ pub struct RegularAsyncAnalyzerBuilder<FirstPassFn:   FnMut(Option<AlgoDataType>
 
     first_pass_n: u64,
     first_pass_fn: Option<FirstPassFn>,
-    first_pass_measurements: Option<Vec<PresentableMeasurement>>,
+    first_pass_measurements: Option<Vec<CustomMeasurement>>,
     first_pass_assertion_fn: Option<Box<dyn FnMut(&AlgoDataType) -> Pin<Box<dyn Future<Output=()> + Send>> + Send + Sync>>,
 
     second_pass_n: u64,
     second_pass_fn: Option<SecondPassFn>,
-    second_pass_measurements: Option<Vec<PresentableMeasurement>>,
+    second_pass_measurements: Option<Vec<CustomMeasurement>>,
     second_pass_assertion_fn: Option<Box<dyn FnMut(&AlgoDataType) -> Pin<Box<dyn Future<Output=()> + Send>> + Send + Sync>>,
 
     time_measurement: Option<BigOAlgorithmComplexity>,
@@ -53,7 +43,7 @@ pub struct RegularAsyncAnalyzerBuilder<FirstPassFn:   FnMut(Option<AlgoDataType>
 
     /// Measurements are done in a "delta" fashion.
     /// For details, see [Self::add_custom_measurement()].
-    custom_measurements: Vec<CustomMeasurement<AlgoDataType>>,
+    custom_measurers: Vec<Box<dyn CustomMeasurerExecutor<AlgoDataType>>>,
 }
 
 
@@ -126,7 +116,7 @@ RegularAsyncAnalyzerBuilder<FirstPassFn, FirstPassFut, SecondPassFn, SecondPassF
         }
 
         println!("## taking pre-1st pass measurements -- in the reverse order they were declared");
-        measure_all_before_event(reset_optional_result.as_ref(), &mut self.custom_measurements).await;
+        measure_all_before_event(reset_optional_result.as_ref(), &mut self.custom_measurers).await;
 
         let first_pass_result = run_if!(&mut self.first_pass_fn, reset_optional_result).await
             .expect("BUG!!! 1st pass function is not present! That should be impossible!");
@@ -134,11 +124,11 @@ RegularAsyncAnalyzerBuilder<FirstPassFn, FirstPassFut, SecondPassFn, SecondPassF
 
         println!("## taking post-1st pass delta measurements -- in the same order they were declared");
         let first_pass_measurements = {
-            measure_all_after_event(Some(&first_pass_result), &mut self.custom_measurements).await
+            measure_all_after_event(Some(&first_pass_result), &mut self.custom_measurers).await
         };
         println!("## dumping 2nd pass measurements:");
-        for (i, custom_measurement) in self.custom_measurements.iter().enumerate() {
-            println!("  ## {} = {}", custom_measurement.name, first_pass_measurements[i]);
+        for custom_measurement in first_pass_measurements.iter() {
+            println!("  ## {} = {}", custom_measurement.name, custom_measurement.measured_data);
         }
         self.first_pass_measurements.replace(first_pass_measurements);
 
@@ -157,17 +147,17 @@ RegularAsyncAnalyzerBuilder<FirstPassFn, FirstPassFut, SecondPassFn, SecondPassF
         }
 
         println!("## taking pre-2nd pass measurements -- in the reverse order they were declared");
-        measure_all_before_event(reset_optional_result.as_ref(), &mut self.custom_measurements).await;
+        measure_all_before_event(reset_optional_result.as_ref(), &mut self.custom_measurers).await;
 
         let second_pass_result = run_if!(&mut self.second_pass_fn, reset_optional_result).await
             .expect("BUG!!! 2st pass function is not present! That should be impossible!");
         println!("## second_pass_fn was executed. second_pass_result: {second_pass_result:?}");
 
         println!("## taking post-2nd pass delta measurements -- in the same order they were declared");
-        let second_pass_measurements = measure_all_after_event(Some(&second_pass_result), &mut self.custom_measurements).await;
+        let second_pass_measurements = measure_all_after_event(Some(&second_pass_result), &mut self.custom_measurers).await;
         println!("## dumping 2nd pass measurements:");
-        for (i, custom_measurement) in self.custom_measurements.iter().enumerate() {
-            println!("  ## {} = {}", custom_measurement.name, second_pass_measurements[i]);
+        for custom_measurement in second_pass_measurements.iter() {
+            println!("  ## {} = {}", custom_measurement.name, custom_measurement.measured_data);
         }
         self.second_pass_measurements.replace(second_pass_measurements);
 
@@ -210,7 +200,7 @@ RegularAsyncAnalyzerBuilder<FirstPassFn, FirstPassFut, SecondPassFn, SecondPassF
             space_measurement: None,
             auxiliary_space_measurement: None,
 
-            custom_measurements: vec![],
+            custom_measurers: vec![],
         }
     }
 
@@ -311,18 +301,13 @@ RegularAsyncAnalyzerBuilder<FirstPassFn, FirstPassFut, SecondPassFn, SecondPassF
                                   AfterFut:  Future<Output=PresentableMeasurement> + Send + 'static>
                                  (mut self,
                                   name: impl Into<String>,
-                                  expected: BigOAlgorithmComplexity,
+                                  expected_complexity: BigOAlgorithmComplexity,
                                   description: impl Into<String>,
                                   before_event_measurer_fn: impl FnMut(Option<&AlgoDataType>) -> BeforeFut + Send + Sync + 'static,
                                   after_event_measurer_fn:  impl FnMut(Option<&AlgoDataType>, BeforeMeasurerOutput) -> AfterFut + Send + Sync + 'static)
                                  -> Self {
-        let measurer_executor = Box::new(Measurer::new(before_event_measurer_fn, after_event_measurer_fn));
-        self.custom_measurements.push(CustomMeasurement {
-            name: name.into(),
-            expected_complexity: expected,
-            description: description.into(),
-            measurer_executor,
-        });
+        let measurer_executor = Box::new(CustomMeasurer::new(name, expected_complexity, description, before_event_measurer_fn, after_event_measurer_fn));
+        self.custom_measurers.push(measurer_executor);
         self
     }
 
@@ -331,18 +316,13 @@ RegularAsyncAnalyzerBuilder<FirstPassFn, FirstPassFut, SecondPassFn, SecondPassF
                                                 AfterFut:  Future<Output=PresentableMeasurement> + Send + 'static>
                                                (mut self,
                                                 name: &str,
-                                                expected: BigOAlgorithmComplexity,
+                                                expected_complexity: BigOAlgorithmComplexity,
                                                 description: &str,
                                                 before_event_measurer_fn: impl FnMut(Option<&AlgoDataType>) -> BeforeFut + Send + Sync + 'static,
                                                 after_event_measurer_fn:  impl FnMut(Option<&AlgoDataType>, BeforeMeasurerOutput) -> AfterFut + Send + Sync + 'static)
                                                -> Self {
-        let measurer_executor = Box::new(Measurer::new(before_event_measurer_fn, after_event_measurer_fn));
-        self.custom_measurements.push(CustomMeasurement {
-            name: name.into(),
-            expected_complexity: expected,
-            description: description.into(),
-            measurer_executor,
-        });
+        let measurer_executor = Box::new(CustomMeasurer::new(name, expected_complexity, description, before_event_measurer_fn, after_event_measurer_fn));
+        self.custom_measurers.push(measurer_executor);
         self
     }
 }
@@ -352,6 +332,7 @@ RegularAsyncAnalyzerBuilder<FirstPassFn, FirstPassFut, SecondPassFn, SecondPassF
 mod tests {
     use std::future;
     use std::time::Instant;
+    use crate::utils::measurements;
     use super::*;
 
     #[tokio::test]

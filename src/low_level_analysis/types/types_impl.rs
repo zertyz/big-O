@@ -4,7 +4,7 @@
 
 use super::types::*;
 use std::fmt::{Display, Formatter};
-
+use std::time::Duration;
 
 impl BigOAlgorithmComplexity {
     /// verbose description for each enum element
@@ -60,91 +60,86 @@ impl<T: BigOAlgorithmMeasurements> Display for BigOAlgorithmAnalysis<T> {
 }
 
 
-impl<ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for AlgorithmMeasurements<'_, ScalarTimeUnit> {
+impl BigOAlgorithmMeasurements for AlgorithmMeasurements<'_> {
     fn space_measurements(&self) -> &BigOSpaceMeasurements {
         &self.space_measurements
     }
 }
-impl<ScalarTimeUnit: Copy> Display for AlgorithmMeasurements<'_, ScalarTimeUnit> {
+impl Display for AlgorithmMeasurements<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let pass_1_time  = format!("{}", self.time_measurements.pass_1_measurements);
-        let pass_2_time  = format!("{}", self.time_measurements.pass_2_measurements);
+        let pass_1_time  = format!("{:?}", self.time_measurements.pass_1_measurements);
+        let pass_2_time  = format!("{:?}", self.time_measurements.pass_2_measurements);
         let pass_1_space = format!("{}", self.space_measurements.pass_1_measurements);
         let pass_2_space = format!("{}", self.space_measurements.pass_2_measurements);
         let pass_1_space_per_n = format!("{}", self.space_measurements.pass_1_measurements.fmt_over_n(self.passes_info.pass1_n));
         let pass_2_space_per_n = format!("{}", self.space_measurements.pass_2_measurements.fmt_over_n(self.passes_info.pass2_n));
         write!(f, "'{}' regular-algorithm measurements:\n\
                    pass          Δt              Δs             n            s⁻           t⁻\n\
-                   1) {:>13}  {:>14}  {:>12}  {:>12}  {:>12.3}{}\n\
-                   2) {:>13}  {:>14}  {:>12}  {:>12}  {:>12.3}{}\n",
+                   1) {:>13}  {:>14}  {:>12}  {:>12}  {:>12.3?}\n\
+                   2) {:>13}  {:>14}  {:>12}  {:>12}  {:>12.3?}\n",
 
                self.measurement_name,
 
                pass_1_time, pass_1_space, self.passes_info.pass1_n,
                pass_1_space_per_n,
-               self.time_measurements.pass_1_measurements.elapsed_time as f64 / self.passes_info.pass1_n as f64, self.time_measurements.pass_1_measurements.time_unit.unit_str,
+               Duration::from_secs_f64(self.time_measurements.pass_1_measurements.as_secs_f64() / self.passes_info.pass1_n as f64),
 
                pass_2_time, pass_2_space, self.passes_info.pass2_n,
                pass_2_space_per_n,
-               self.time_measurements.pass_2_measurements.elapsed_time as f64 / self.passes_info.pass2_n as f64, self.time_measurements.pass_2_measurements.time_unit.unit_str
+               Duration::from_secs_f64(self.time_measurements.pass_2_measurements.as_secs_f64() / self.passes_info.pass2_n as f64)
         )
     }
 }
 
 
-impl<ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for ConstantSetIteratorAlgorithmMeasurements<'_, ScalarTimeUnit> {
+impl BigOAlgorithmMeasurements for ConstantSetIteratorAlgorithmMeasurements<'_> {
     fn space_measurements(&self) -> &BigOSpaceMeasurements {
         &self.space_measurements
     }
 }
-impl<ScalarTimeUnit: Copy> Display for ConstantSetIteratorAlgorithmMeasurements<'_, ScalarTimeUnit> {
+impl Display for ConstantSetIteratorAlgorithmMeasurements<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let pass_1_time  = format!("{}", self.time_measurements.pass_1_measurements);
-        let pass_2_time  = format!("{}", self.time_measurements.pass_2_measurements);
+        let pass_1_time  = format!("{:?}", self.time_measurements.pass_1_measurements);
+        let pass_2_time  = format!("{:?}", self.time_measurements.pass_2_measurements);
         let pass_1_space = format!("{}", self.space_measurements.pass_1_measurements);
         let pass_2_space = format!("{}", self.space_measurements.pass_2_measurements);
         write!(f, "'{}' constant set iterator-algorithm measurements:\n\
                    pass          Δt              Δs            Σn            ⊆r            t⁻\n\
-                   1) {:>13}  {:>14}  {:>12}  {:>12}  {:>12.3}{}\n\
-                   2) {:>13}  {:>14}  {:>12}  {:>12}  {:>12.3}{}\n",
+                   1) {:>13}  {:>14}  {:>12}  {:>12}  {:>12.3?}\n\
+                   2) {:>13}  {:>14}  {:>12}  {:>12}  {:>12.3?}\n",
 
                self.measurement_name,
 
                pass_1_time, pass_1_space, self.passes_info.pass_1_set_size,
-               self.passes_info.repetitions, self.time_measurements.pass_1_measurements.elapsed_time as f64 / self.passes_info.repetitions as f64, self.time_measurements.pass_1_measurements.time_unit.unit_str,
+               self.passes_info.repetitions,
+               Duration::from_secs_f64(self.time_measurements.pass_1_measurements.as_secs_f64() / self.passes_info.repetitions as f64),
 
                pass_2_time, pass_2_space, self.passes_info.pass_2_set_size,
-               self.passes_info.repetitions, self.time_measurements.pass_2_measurements.elapsed_time as f64 / self.passes_info.repetitions as f64, self.time_measurements.pass_2_measurements.time_unit.unit_str
+               self.passes_info.repetitions,
+               Duration::from_secs_f64(self.time_measurements.pass_2_measurements.as_secs_f64() / self.passes_info.repetitions as f64),
         )
     }
 }
 
 
-impl<ScalarTimeUnit: Copy> BigOAlgorithmMeasurements for SetResizingIteratorAlgorithmMeasurements<'_, ScalarTimeUnit> {
+impl BigOAlgorithmMeasurements for SetResizingIteratorAlgorithmMeasurements<'_> {
     fn space_measurements(&self) -> &BigOSpaceMeasurements {
         &self.space_measurements
     }
 }
-impl<ScalarTimeUnit: Copy> Display for SetResizingIteratorAlgorithmMeasurements<'_, ScalarTimeUnit> {
+impl Display for SetResizingIteratorAlgorithmMeasurements<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let pass_1_time  = format!("{}", self.time_measurements.pass_1_measurements);
-        let pass_2_time  = format!("{}", self.time_measurements.pass_2_measurements);
+        let pass_1_time  = format!("{:?}", self.time_measurements.pass_1_measurements);
+        let pass_2_time  = format!("{:?}", self.time_measurements.pass_2_measurements);
         let pass_1_space = format!("{}", self.space_measurements.pass_1_measurements);
         let pass_2_space = format!("{}", self.space_measurements.pass_2_measurements);
         write!(f, "'{}' set resizing iterator-algorithm measurements:\n\
                    pass          Δt              Δs            Σn            t⁻\n\
-                   1) {:>13}  {:>14}  {:>12}  {:>12.3}{}\n\
-                   2) {:>13}  {:>14}  {:>12}  {:>12.3}{}\n",
+                   1) {:>13}  {:>14}  {:>12}  {:>12.3?}\n\
+                   2) {:>13}  {:>14}  {:>12}  {:>12.3?}\n",
                self.measurement_name,
-               pass_1_time, pass_1_space, self.passes_info.delta_set_size,   self.time_measurements.pass_1_measurements.elapsed_time as f64 / self.passes_info.delta_set_size as f64, self.time_measurements.pass_1_measurements.time_unit.unit_str,
-               pass_2_time, pass_2_space, self.passes_info.delta_set_size*2, self.time_measurements.pass_2_measurements.elapsed_time as f64 / self.passes_info.delta_set_size as f64, self.time_measurements.pass_2_measurements.time_unit.unit_str)
-    }
-}
-
-
-impl<ScalarTimeUnit: Copy> Display for BigOTimePassMeasurements<'_,ScalarTimeUnit> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", self.elapsed_time, self.time_unit.unit_str)
+               pass_1_time, pass_1_space, self.passes_info.delta_set_size,   Duration::from_secs_f64(self.time_measurements.pass_1_measurements.as_secs_f64() / self.passes_info.delta_set_size as f64),
+               pass_2_time, pass_2_space, self.passes_info.delta_set_size*2, Duration::from_secs_f64(self.time_measurements.pass_2_measurements.as_secs_f64() / self.passes_info.delta_set_size as f64))
     }
 }
 

@@ -12,33 +12,29 @@ use std::{
 
 /// wrap around the original [run_iterator_pass()] to output progress & intermediate results
 pub fn run_iterator_pass_verbosely<'a, _IteratorAlgorithmClosure: Fn(u32) -> u32 + Sync,
-                                       _OutputClosure:            FnMut(&str),
-                                       T: TryInto<u64> + Copy>
+                                       _OutputClosure:            FnMut(&str)>
                                   (result_prefix:      &str,
                                    result_suffix:      &str,
                                    iterator_algorithm: &_IteratorAlgorithmClosure,
                                    algorithm_type:     &BigOIteratorAlgorithmType,
                                    range:              Range<u32>,
-                                   time_unit:          &'a TimeUnit<T>,
                                    threads:            u32,
                                    mut output:         _OutputClosure)
-                                  -> (PassResult<'a,T>, u32) {
-    let (pass_result, r) = run_iterator_pass(iterator_algorithm, algorithm_type, range, time_unit, threads);
-    output(&format!("{}{}/{}{}", result_prefix, pass_result.time_measurements, pass_result.space_measurements, result_suffix));
+                                  -> (PassResult, u32) {
+    let (pass_result, r) = run_iterator_pass(iterator_algorithm, algorithm_type, range, threads);
+    output(&format!("{}{:?}/{}{}", result_prefix, pass_result.time_measurements, pass_result.space_measurements, result_suffix));
     (pass_result, r)
 }
 
 /// wrap around the original [run_pass()] to output progress & intermediate results
-pub fn run_pass_verbosely<'a, _OutputClosure:    FnMut(&str),
-                              T: TryInto<u64> + Copy>
+pub fn run_pass_verbosely<'a, _OutputClosure:    FnMut(&str)>
                          (result_prefix:  &str,
                           result_suffix:  &str,
                           algorithm:      impl FnMut() -> u32,
-                          time_unit:      &'a TimeUnit<T>,
                           mut output:     _OutputClosure)
-                         -> (PassResult<'a,T>, u32) {
-    let (pass_result, r) = run_pass(algorithm, time_unit);
-    output(&format!("{}{}/{}{}", result_prefix, pass_result.time_measurements, pass_result.space_measurements, result_suffix));
+                         -> (PassResult, u32) {
+    let (pass_result, r) = run_pass(algorithm);
+    output(&format!("{}{:?}/{}{}", result_prefix, pass_result.time_measurements, pass_result.space_measurements, result_suffix));
     (pass_result, r)
 }
 
@@ -54,14 +50,12 @@ pub fn run_pass_verbosely<'a, _OutputClosure:    FnMut(&str),
 ///     fn iterator_algorithm(i: u32) -> u32 {0}
 /// ```
 /// returns: tuple with ([PassResult], computed_number: u32)
-pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync,
-                                    _ScalarDuration:   TryInto<u64> + Copy>
+pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync>
                                (iterator_algorithm: &_AlgorithmClosure,
                                 algorithm_type:     &BigOIteratorAlgorithmType,
                                 range:              Range<u32>,
-                                time_unit:          &'a TimeUnit<_ScalarDuration>,
                                 threads:            u32)
-                               -> (PassResult<'a,_ScalarDuration>, u32) {
+                               -> (PassResult, u32) {
 
     type ThreadLoopResult = (Duration, u32);
 
@@ -104,7 +98,7 @@ pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync,
         (thread_duration, thread_r)
     }
 
-    // use crossbeam's scoped threads to avoid requiring a 'static lifetime for our algorithm closure
+    // use crossbeam's scoped threads to avoid requiring a 'static lifetime for our algorithm's closure
     crossbeam::scope(|scope| {
 
         // start all threads
@@ -119,25 +113,22 @@ pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync,
 
         // wait for them all to finish
         let mut r = range.start+1;
-        let mut elapsed_average = 0.0f64;
+        let mut elapsed_seconds_average = 0.0f64;
         for handler in thread_handlers {
             let joining_result = handler.join();
             if joining_result.is_err() {
                 panic!("Panic! while running provided 'algorithm' closure: algo type: {:?}, range: {:?}: Error: {:?}", algorithm_type, range, joining_result.unwrap_err())
             }
             let (thread_duration, thread_r) = joining_result.unwrap();
-            let thread_elapsed = (time_unit.duration_conversion_fn_ptr)(&thread_duration).try_into().unwrap_or_default();
-            elapsed_average += thread_elapsed as f64 / threads as f64;
+            let thread_elapsed_seconds = thread_duration.as_secs_f64();
+            elapsed_seconds_average += thread_elapsed_seconds as f64 / threads as f64;
             r ^= thread_r;
         }
 
         let allocator_statistics = features::ALLOC.delta_statistics(&allocator_savepoint);
 
         (PassResult {
-            time_measurements:  BigOTimePassMeasurements {
-                elapsed_time: elapsed_average.round() as u64,
-                time_unit,
-            },
+            time_measurements:  Duration::from_secs_f64(elapsed_seconds_average),
             space_measurements: BigOSpacePassMeasurements {
                 used_memory_before: allocator_savepoint.metrics.current_used_memory,
                 used_memory_after:  allocator_statistics.current_used_memory,
@@ -159,23 +150,17 @@ pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync,
 ///     fn algorithm() -> u32 {0}
 /// ```
 /// returns: tuple with ([PassResult]], computed_number: u32)
-pub(crate) fn run_pass<_ScalarDuration:   TryInto<u64> + Copy>
-                      (mut algorithm:  impl FnMut() -> u32,
-                       time_unit:      &TimeUnit<_ScalarDuration>)
-                      -> (PassResult<'_, _ScalarDuration>, u32) {
+pub(crate) fn run_pass(mut algorithm:  impl FnMut() -> u32)
+                      -> (PassResult, u32) {
 
     let allocator_savepoint = features::ALLOC.save_point();
     let start = SystemTime::now();
     let r = algorithm();
     let duration = start.elapsed().unwrap();
-    let elapsed = (time_unit.duration_conversion_fn_ptr)(&duration).try_into().unwrap_or_default();
     let allocator_statistics = features::ALLOC.delta_statistics(&allocator_savepoint);
 
     (PassResult {
-        time_measurements:  BigOTimePassMeasurements {
-            elapsed_time: elapsed,
-            time_unit,
-        },
+        time_measurements:  duration,
         space_measurements: BigOSpacePassMeasurements {
             used_memory_before: allocator_savepoint.metrics.current_used_memory,
             used_memory_after:  allocator_statistics.current_used_memory,
@@ -187,17 +172,14 @@ pub(crate) fn run_pass<_ScalarDuration:   TryInto<u64> + Copy>
 
 /// contains the measurements for a pass done in [run_pass()]
 #[derive(Clone,Copy)]
-pub struct PassResult<'a,ScalarTimeUnit: Copy> {
-    pub time_measurements:  BigOTimePassMeasurements<'a,ScalarTimeUnit>,
+pub struct PassResult {
+    pub time_measurements:  Duration,
     pub space_measurements: BigOSpacePassMeasurements,
 }
-impl<ScalarTimeUnit: Copy> Default for PassResult<'_,ScalarTimeUnit> {
+impl Default for PassResult {
     fn default() -> Self {
         Self {
-            time_measurements: BigOTimePassMeasurements {
-                elapsed_time: 0,
-                time_unit: TimeUnits::get_const_default(),
-            },
+            time_measurements: Duration::default(),
             space_measurements: BigOSpacePassMeasurements {
                 used_memory_before: 0,
                 used_memory_after:  0,

@@ -58,12 +58,12 @@ pub fn duration_measurement(duration: Duration) -> PresentableMeasurement {
 pub fn bytes_measurement(value: f64) -> PresentableMeasurement {
     static AUTO_SCALE_DATA: Lazy<Vec<(f64, f64, Cow<'static, str>, &'static str)>> = Lazy::new(|| {
         [
-            (1024.0*1024.0*1024.0*1024.0, "TiB", ":.2"),
-            (       1024.0*1024.0*1024.0, "GiB", ":.2"),
-            (              1024.0*1024.0, "MiB", ":.2"),
-            (                     1024.0, "KiB", ":.2"),
-            (                        1.0, "b",   ":.0"),
-            (                        0.0, "b",   ":.0"),
+            ((1u64<<40) as f64, "TiB", ":.2"),
+            ((1u64<<30) as f64, "GiB", ":.2"),
+            ((1u64<<20) as f64, "MiB", ":.2"),
+            ((1u64<<10) as f64, "KiB", ":.2"),
+            (1.0,               "b",   ":.0"),
+            (0.0,               "b",   ":.0"),
         ]
         .into_iter()
         .map(|(threshold, suffix, format)| (
@@ -86,14 +86,14 @@ pub fn bytes_measurement(value: f64) -> PresentableMeasurement {
 pub fn bytes_per_second_measurement(value: f64) -> PresentableMeasurement {
     static AUTO_SCALE_DATA: Lazy<Vec<(f64, f64, Cow<'static, str>, &'static str)>> = Lazy::new(|| {
         [
-            (1024.0*1024.0*1024.0*1024.0, "TiB/s", ":.2"),
-            (       1024.0*1024.0*1024.0, "GiB/s", ":.2"),
-            (              1024.0*1024.0, "MiB/s", ":.2"),
-            (                     1024.0, "KiB/s", ":.2"),
-            (                        1.0, "b/s",   ":.2"),
-            (                   1.0/60.0, "b/min", ":.2"),
-            (                 1.0/3600.0, "b/hr",  ":.2"),
-            (                        0.0, "b/s",   ":.0"),
+            ((1u64<<40) as f64, "TiB/s", ":.2"),
+            ((1u64<<30) as f64, "GiB/s", ":.2"),
+            ((1u64<<20) as f64, "MiB/s", ":.2"),
+            ((1u64<<10) as f64, "KiB/s", ":.2"),
+            (       1.0,        "b/s",   ":.2"),
+            (  1.0/60.0,        "b/min", ":.2"),
+            (1.0/3600.0,        "b/hr",  ":.2"),
+            (       0.0,        "b/s",   ":.0"),
         ]
         .into_iter()
         .map(|(threshold, suffix, format)| (
@@ -119,20 +119,23 @@ pub fn custom_unit_measurement(value: f64, custom_unit: &'static str) -> Present
 
     // non-synchronized one-time cache
     let auto_scale_data = unsafe {
-        AUTO_SCALE_DATA
-            .get_or_insert_with(HashMap::new)
-            .entry(custom_unit)
-            .or_insert_with(|| {
-                [
-                    (100_000.0, custom_unit, ":.3e"),
-                    (      1.0, custom_unit, ":.2"),
-                    (      0.0, custom_unit, ":.0"),
-                ]
-                .into_iter()
-                .map(|(threshold, suffix, format)| (threshold, 1.0, Cow::Borrowed(suffix), format))
-                .collect()
-            })
-    };
+        #[allow(static_mut_refs)]
+        // safety: this crate ensures a single thread will call the measurement & report functions.
+        // The alternative would be to use Mutexes, which are not needed in this case
+        &mut AUTO_SCALE_DATA
+    }
+        .get_or_insert_with(HashMap::new)
+        .entry(custom_unit)
+        .or_insert_with(|| {
+            [
+                (100_000.0, custom_unit, ":.3e"),
+                (      1.0, custom_unit, ":.2"),
+                (      0.0, custom_unit, ":.0"),
+            ]
+            .into_iter()
+            .map(|(threshold, suffix, format)| (threshold, 1.0, Cow::Borrowed(suffix), format))
+            .collect()
+        });
 
     PresentableMeasurement {
         value,
@@ -149,22 +152,25 @@ fn custom_unit_per_second_measurement(value: f64, custom_unit: &'static str) -> 
 
     // non-synchronized cache per `custom_unit`
     let auto_scale_data = unsafe {
-        AUTO_SCALE_DATA
-            .get_or_insert_with(HashMap::new)
-            .entry(custom_unit)
-            .or_insert_with(|| {
-                [
-                    (100_000.0,  1.0,        format!("{custom_unit}/s"), ":.3e"),
-                    (1.0,        1.0,        format!("{custom_unit}/s"), ":.2"),
-                    (1.0/60.0,   1.0/60.0,   format!("{custom_unit}/min"), ":.2"),
-                    (1.0/3600.0, 1.0/3600.0, format!("{custom_unit}/hr"), ":.2"),
-                    (0.0,        1.0,        format!("{custom_unit}/s"), ":.0"),
-                ]
-                .into_iter()
-                .map(|(threshold, rate, suffix, format)| (threshold, rate, Cow::Owned(suffix), format))
-                .collect()
-            })
-    };
+        #[allow(static_mut_refs)]
+        // safety: this crate ensures a single thread will call the measurement & report functions.
+        // The alternative would be to use Mutexes, which are not needed in this case
+        &mut AUTO_SCALE_DATA
+    }
+        .get_or_insert_with(HashMap::new)
+        .entry(custom_unit)
+        .or_insert_with(|| {
+            [
+                (100_000.0,  1.0,        format!("{custom_unit}/s"), ":.3e"),
+                (1.0,        1.0,        format!("{custom_unit}/s"), ":.2"),
+                (1.0/60.0,   1.0/60.0,   format!("{custom_unit}/min"), ":.2"),
+                (1.0/3600.0, 1.0/3600.0, format!("{custom_unit}/hr"), ":.2"),
+                (0.0,        1.0,        format!("{custom_unit}/s"), ":.0"),
+            ]
+            .into_iter()
+            .map(|(threshold, rate, suffix, format)| (threshold, rate, Cow::Owned(suffix), format))
+            .collect()
+        });
 
     PresentableMeasurement {
         value,
