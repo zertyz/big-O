@@ -207,13 +207,6 @@ impl Display for BigOSpacePassMeasurements {
 }
 
 
-impl<T> Default for TimeUnit<T> {
-    fn default() -> Self {
-        Self { unit_str: "N/A", duration_conversion_fn_ptr: |_| panic!("use of default TimeUnit") }
-    }
-}
-
-
 #[cfg(test)]
 mod tests {
 

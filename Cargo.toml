@@ -46,7 +46,7 @@ crossbeam = "0.8"                        # scoped threads
 
 [dev-dependencies]      # dev dependencies should become normal dependencies when building docs for tests
 ctor = "0.2"            # initializer functions -- that run before main
-serial_test = "3"            # run tests serially
+serial_test = "3"                       # run tests serially
 parking_lot = "0.12"        # way faster than std mutex
 spin_sleep = "1.1"            # precise sleeping, avoiding busy loops on some tests
 rand = "0.8"           # used by some tests to avoid call cancellation optimizations when running in release mode

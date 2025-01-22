@@ -6,16 +6,15 @@ use crate::{
     features::{OUTPUT},
     low_level_analysis::{
         self,
-        types::{BigOIteratorAlgorithmType, TimeUnit, ConstantSetIteratorAlgorithmMeasurements, SetResizingIteratorAlgorithmMeasurements,
+        types::{BigOIteratorAlgorithmType, ConstantSetIteratorAlgorithmMeasurements, SetResizingIteratorAlgorithmMeasurements,
                 BigOAlgorithmAnalysis, BigOTimeMeasurements, BigOSpaceMeasurements,
                 SetResizingIteratorAlgorithmPassesInfo, ConstantSetIteratorAlgorithmPassesInfo, BigOAlgorithmComplexity},
     },
     runners::common::*,
 };
 use std::{
-    convert::TryInto,
     ops::Range,
-    time::{SystemTime},
+    time::{Instant},
     io::{self, Write},
     {error::Error, fmt},
     fmt::{Display, Formatter},
@@ -26,21 +25,19 @@ use std::{
 /// Runs [analyze_crud_algorithms()], trying to match the given maximum time & space complexities to the ones observed in runtime when running the algorithm
 /// -- retrying as much as `max_retry_attempts` to avoid flaky test results.\
 /// In case of rejection, a detailed run log with measurements & analysis results is issued.
-pub fn test_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
-                                CreateClosure: Fn(u32) -> u32 + Sync,
-                                ReadClosure:   Fn(u32) -> u32 + Sync,
-                                UpdateClosure: Fn(u32) -> u32 + Sync,
-                                DeleteClosure: Fn(u32) -> u32 + Sync,
-                                TimeUnitType:  TryInto<u64> + Copy >
-                           (crud_name: &'a str, max_retry_attempts: u32,
+pub fn test_crud_algorithms<ResetClosure:  Fn(u32) -> u32 + Sync,
+                            CreateClosure: Fn(u32) -> u32 + Sync,
+                            ReadClosure:   Fn(u32) -> u32 + Sync,
+                            UpdateClosure: Fn(u32) -> u32 + Sync,
+                            DeleteClosure: Fn(u32) -> u32 + Sync>
+                           (crud_name: &str, max_retry_attempts: u32,
                             reset_fn:  ResetClosure,
                             create_fn: CreateClosure, expected_create_time_complexity: BigOAlgorithmComplexity, expected_create_space_complexity: BigOAlgorithmComplexity,
                             read_fn:   ReadClosure,   expected_read_time_complexity:   BigOAlgorithmComplexity, expected_read_space_complexity:   BigOAlgorithmComplexity,
                             update_fn: UpdateClosure, expected_update_time_complexity: BigOAlgorithmComplexity, expected_update_space_complexity: BigOAlgorithmComplexity,
                             delete_fn: DeleteClosure, expected_delete_time_complexity: BigOAlgorithmComplexity, expected_delete_space_complexity: BigOAlgorithmComplexity,
                             warmup_percentage: u32, create_iterations_per_pass: u32, read_iterations_per_pass: u32, update_iterations_per_pass: u32, delete_iterations_per_pass: u32,
-                            create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32,
-                            time_unit: &'a TimeUnit<TimeUnitType>)
+                            create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32)
                            where PassResult: Copy {
 
     // adapts the 'iterations_per_pass' to the 'attempt' number, so each retry uses slightly different values
@@ -75,8 +72,7 @@ pub fn test_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
                                                              &update_fn, expected_update_time_complexity, expected_update_space_complexity,
                                                              &delete_fn, expected_delete_time_complexity, expected_delete_space_complexity,
                                                              warmup_percentage, adapted_create_iterations_per_pass, adapted_read_iterations_per_pass, adapted_update_iterations_per_pass, adapted_delete_iterations_per_pass,
-                                                             create_threads, read_threads, update_threads, delete_threads,
-                                                             time_unit);
+                                                             create_threads, read_threads, update_threads, delete_threads);
 
         // In case of error, retry only if the complexity analysis failed to match the maximum requirement for Time,
         // which can be affected by run-time environment conditions (specially if the involved machines aren't fully idle
@@ -154,26 +150,24 @@ pub fn test_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
 ///                    numbers are integers, so the unit should be at least one or two orders of magnitude
 ///                    broader than the measured values. Space measurements are always in bytes and their
 ///                    presentation unit (b, KiB, MiB or GiB) are automatically selected.
-pub fn analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
-                                   CreateClosure: Fn(u32) -> u32 + Sync,
-                                   ReadClosure:   Fn(u32) -> u32 + Sync,
-                                   UpdateClosure: Fn(u32) -> u32 + Sync,
-                                   DeleteClosure: Fn(u32) -> u32 + Sync,
-                                   TimeUnitType: TryInto<u64> + Copy >
-                              (crud_name: &'a str,
+pub fn analyse_crud_algorithms<ResetClosure:  Fn(u32) -> u32 + Sync,
+                               CreateClosure: Fn(u32) -> u32 + Sync,
+                               ReadClosure:   Fn(u32) -> u32 + Sync,
+                               UpdateClosure: Fn(u32) -> u32 + Sync,
+                               DeleteClosure: Fn(u32) -> u32 + Sync>
+                              (crud_name: &str,
                                reset_fn: ResetClosure,
                                create_fn: CreateClosure,
                                read_fn: ReadClosure,
                                update_fn: UpdateClosure,
                                delete_fn: DeleteClosure,
                                warmup_percentage: u32, create_iterations_per_pass: u32, read_iterations_per_pass: u32, update_iterations_per_pass: u32, delete_iterations_per_pass: u32,
-                               create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32,
-                               time_unit: &'a TimeUnit<TimeUnitType>)
-                              -> (Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a>> >,    // create analysis
-                                  Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a>> >,    // read analysis
-                                  Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a>> >,    // update analysis
-                                  Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a>> >,    // delete analysis
-                                  String)                                                                           // the full report
+                               create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32)
+                              -> (Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements> >,    // create analysis
+                                  Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements> >,    // read analysis
+                                  Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements> >,    // update analysis
+                                  Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements> >,    // delete analysis
+                                  String)                                                                       // the full report
                               where PassResult: Copy {
 
     internal_analyse_crud_algorithms(crud_name, reset_fn,
@@ -182,8 +176,7 @@ pub fn analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
                                      update_fn, BigOAlgorithmComplexity::WorseThanExponential,  BigOAlgorithmComplexity::WorseThanExponential,
                                      delete_fn,  BigOAlgorithmComplexity::WorseThanExponential,  BigOAlgorithmComplexity::WorseThanExponential,
                                      warmup_percentage, create_iterations_per_pass, read_iterations_per_pass, update_iterations_per_pass, delete_iterations_per_pass,
-                                     create_threads, read_threads, update_threads, delete_threads,
-                                     time_unit).unwrap()
+                                     create_threads, read_threads, update_threads, delete_threads).unwrap()
 }
 
 #[derive(Debug)]
@@ -204,26 +197,24 @@ impl Error for CRUDComplexityAnalysisError {}
 
 /// Returns the analysed complexities + the full report, as a string in the form (create, read, update, delete, report).
 /// If one of the measured complexities don't match the maximum expected, None is returned for that analysis, provided it's *_number_of_iterations_per_pass is > 0.
-fn internal_analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
-                                        CreateClosure: Fn(u32) -> u32 + Sync,
-                                        ReadClosure:   Fn(u32) -> u32 + Sync,
-                                        UpdateClosure: Fn(u32) -> u32 + Sync,
-                                        DeleteClosure: Fn(u32) -> u32 + Sync,
-                                        TimeUnitType:  TryInto<u64> + Copy >
-                                   (crud_name: &'a str,
+fn internal_analyse_crud_algorithms<ResetClosure:  Fn(u32) -> u32 + Sync,
+                                    CreateClosure: Fn(u32) -> u32 + Sync,
+                                    ReadClosure:   Fn(u32) -> u32 + Sync,
+                                    UpdateClosure: Fn(u32) -> u32 + Sync,
+                                    DeleteClosure: Fn(u32) -> u32 + Sync>
+                                   (crud_name: &str,
                                     reset_fn:  ResetClosure,
                                     create_fn: CreateClosure, expected_create_time_complexity: BigOAlgorithmComplexity, expected_create_space_complexity: BigOAlgorithmComplexity,
                                     read_fn:   ReadClosure,   expected_read_time_complexity:   BigOAlgorithmComplexity, expected_read_space_complexity:   BigOAlgorithmComplexity,
                                     update_fn: UpdateClosure, expected_update_time_complexity: BigOAlgorithmComplexity, expected_update_space_complexity: BigOAlgorithmComplexity,
                                     delete_fn: DeleteClosure, expected_delete_time_complexity: BigOAlgorithmComplexity, expected_delete_space_complexity: BigOAlgorithmComplexity,
                                     warmup_percentage: u32, create_iterations_per_pass: u32, read_iterations_per_pass: u32, update_iterations_per_pass: u32, delete_iterations_per_pass: u32,
-                                    create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32,
-                                    time_unit: &'a TimeUnit<TimeUnitType>)
-                                   -> Result<(Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a>> >,       // create analysis
-                                              Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a>> >,       // read analysis
-                                              Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements<'a>> >,       // update analysis
-                                              Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements<'a>> >,       // delete analysis
-                                              String),                                                                             // full report
+                                    create_threads: u32, read_threads: u32, update_threads: u32, delete_threads: u32)
+                                   -> Result<(Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements> >,       // create analysis
+                                              Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements> >,       // read analysis
+                                              Option< BigOAlgorithmAnalysis<ConstantSetIteratorAlgorithmMeasurements> >,       // update analysis
+                                              Option< BigOAlgorithmAnalysis<SetResizingIteratorAlgorithmMeasurements> >,       // delete analysis
+                                              String),                                                                         // full report
                                              CRUDComplexityAnalysisError>
                                    where PassResult: Copy {
 
@@ -315,7 +306,7 @@ fn internal_analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
     ///   - [pass_number] -- u32 in the range [0..NUMBER_OF_PASSES]: specifies the number of the pass being run
     ///   - [operation_name] -- &str: either "Read" or "Update"
     ///   - [suffix] -- &str: ", " or "" -- used to correctly separate intermediate results
-    ///   - [result_prefix_closure] -- fn (pass_number, operation_name) -> String: the prefix for [run_pass_verbosely] to show
+    ///   - [result_prefix_closure] -- fn (pass_number, operation_name) -> String: the prefix for [run_sync_pass_verbosely] to show
     ///     the intermediate measurements -- should return "operation_name: " for create; "2nd", "1st; " for delete;
     ///   - [passes_results] -- either [create_passes_results] or [delete_passes_results]: the array to put [PassResults] on
     ///   - [algorithm_closure] -- the algorithm closure to run -- either [create_fn] or [delete_fn]
@@ -443,7 +434,7 @@ fn internal_analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
         let calc_warmup_cru_range = |iterations_per_pass|  0 .. iterations_per_pass * warmup_percentage / 100;
         let calc_warmup_d_range = |iterations_per_pass| iterations_per_pass * warmup_percentage / 100 .. 0;
 
-        let warmup_start = SystemTime::now();
+        let warmup_start = Instant::now();
         _output("warming up [");
         io::stdout().flush().unwrap();
         if create_iterations_per_pass > 0 {
@@ -469,10 +460,9 @@ fn internal_analyse_crud_algorithms<'a, ResetClosure:  Fn(u32) -> u32 + Sync,
         _output("] ");
         reset_fn(create_iterations_per_pass * warmup_percentage / 100);
 
-        let warmup_end = SystemTime::now();
-        let warmup_duration = warmup_end.duration_since(warmup_start).unwrap();
-        let warmup_elapsed = (time_unit.duration_conversion_fn_ptr)(&warmup_duration).try_into().unwrap_or_default();
-        _output(&format!("{}{}, ", warmup_elapsed, time_unit.unit_str));
+        let warmup_end = Instant::now();
+        let warmup_elapsed = warmup_end.duration_since(warmup_start);
+        _output(&format!("{:?}, ", warmup_elapsed));
     }
 
     _output("First Pass (");
@@ -524,7 +514,7 @@ mod tests {
 
     use super::*;
     use crate:: {
-        low_level_analysis::types::{TimeUnits, BigOAlgorithmMeasurements},
+        low_level_analysis::types::BigOAlgorithmMeasurements,
     };
     use std::{
         collections::HashMap,
@@ -609,8 +599,7 @@ mod tests {
                                                |n| (n+1)/(n+1),
                                                iterations_per_pass /100,
                                                iterations_per_pass, iterations_per_pass, iterations_per_pass, iterations_per_pass,
-                                               1, 1, 1, 1,
-                                               &TimeUnits::NANOSECOND);
+                                               1, 1, 1, 1);
         assert!(report.contains("MyContainer"), "CRUD name not present on the full report");
         assert_passes_progress(&report, true, true, true, true, true);
         assert_contains_algorithm_report(&report, create_analysis, "Create");
@@ -630,8 +619,7 @@ mod tests {
                                                |n| (n+1)/(n+1),
                                                |n| (n+1)/(n+1),
                                                0/* no warmup */, iterations_per_pass, iterations_per_pass, iterations_per_pass, iterations_per_pass,
-                                               1, 1, 1, 1,
-                                               &TimeUnits::NANOSECOND);
+                                               1, 1, 1, 1);
         assert_passes_progress(&report, false, true, true, true, true);
 
         // no delete as well
@@ -646,8 +634,7 @@ mod tests {
                                               |n| (n+1)/(n+1),
                                               |_n| panic!("'delete_fn' should not be called if there is no warmup taking place"),
                                               0/*no warmup*/, iterations_per_pass, iterations_per_pass, iterations_per_pass, 0,
-                                              1, 1, 1, 0,
-                                              &TimeUnits::NANOSECOND);
+                                              1, 1, 1, 0);
         assert_passes_progress(&report, false, true, true, true, false);
         assert!(delete_analysis.is_none(), "No Delete Complexity Analysis should have been made");
 
@@ -663,8 +650,7 @@ mod tests {
                                               |_n| panic!("'update_fn' should not be called if there is no warmup taking place"),
                                               |_n| panic!("'delete_fn' should not be called if there is no warmup taking place"),
                                               0/*no warmup*/, iterations_per_pass, 0, 0, 0,
-                                              1, 1, 1, 1,
-                                              &TimeUnits::NANOSECOND);
+                                              1, 1, 1, 1);
         assert_passes_progress(&report, false, true, false, false, false);
     }
 
@@ -695,8 +681,7 @@ mod tests {
                    map.len() as u32
                 },
                 0, iterations_per_pass, 0, 0, iterations_per_pass,
-                n_threads, n_threads, n_threads, n_threads,
-                &TimeUnits::MICROSECOND);
+                n_threads, n_threads, n_threads, n_threads);
             let map = map_locker.read();
             assert_eq!(iterations_per_pass *2, max_length.load(Ordering::Relaxed), "failed to insert records when testing for n_threads {}", n_threads);
             assert_eq!(0, map.len(), "failed to delete records when testing for n_threads {}", n_threads);

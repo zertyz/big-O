@@ -175,31 +175,3 @@ pub struct SetResizingIteratorAlgorithmPassesInfo {
     /// and the test set must start (and/or end) with 0 elements
     pub delta_set_size: u32,
 }
-
-/// Specifies a time unit when measuring / reporting results.
-/// Please use one of the prebuilt 'TimeUnits' constants instead of instantiating this:
-/// [TimeUnits::NANOSECOND], [TimeUnits::MICROSECOND], [TimeUnits::MILLISECOND],  [TimeUnits::SECOND]
-pub struct TimeUnit<T> {
-    /// printable unit suffix: 'ns', 'µs', etc.
-    pub unit_str: &'static str,
-    /// one of [std::time::Duration]'s 'as_micros', 'as_seconds', ... function to convert a Duration object into a scalar
-    pub(crate) duration_conversion_fn_ptr: fn(&std::time::Duration) -> T,
-}
-impl<T> TimeUnit<T> {
-    /// the same as [Self::default()], from which we can return a read-only reference
-    const CONST_DEFAULT: TimeUnit<T> = Self { unit_str: "N/A", duration_conversion_fn_ptr: |_| panic!("use of default TimeUnit") };
-}
-
-/// prebuilt [TimeUnit] constants
-pub struct TimeUnits {}
-impl TimeUnits {
-    pub const NANOSECOND:  TimeUnit<u128> = TimeUnit { unit_str: "ns", duration_conversion_fn_ptr: std::time::Duration::as_nanos};
-    pub const MICROSECOND: TimeUnit<u128> = TimeUnit { unit_str: "µs", duration_conversion_fn_ptr: std::time::Duration::as_micros};
-    pub const MILLISECOND: TimeUnit<u128> = TimeUnit { unit_str: "ms", duration_conversion_fn_ptr: std::time::Duration::as_millis};
-    pub const SECOND:      TimeUnit<u64>  = TimeUnit { unit_str: "s",  duration_conversion_fn_ptr: std::time::Duration::as_secs};
-
-    /// returns a reference to the constant default TimeUnit<T> -- acts as a placeholder for mutable variables
-    pub fn get_const_default<'a,T>() -> &'a TimeUnit<T> {
-        &TimeUnit::<T>::CONST_DEFAULT
-    }
-}

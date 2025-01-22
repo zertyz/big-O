@@ -12,8 +12,7 @@ pub(crate) mod utils;
 pub use {
     features::{ALLOC, OUTPUT},
     low_level_analysis::types::{
-        BigOAlgorithmComplexity,
-        TimeUnits,
+        BigOAlgorithmComplexity
     },
     runners::{
         standard::{test_algorithm,test_constant_set_iterator_algorithm,test_set_resizing_iterator_algorithm},

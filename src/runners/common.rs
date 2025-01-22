@@ -6,9 +6,11 @@ use crate::{
 };
 use std::{
     ops::Range,
-    time::{SystemTime, Duration},
+    time::{Instant, Duration},
 };
-
+use std::fmt::Debug;
+use std::future::Future;
+use std::hint::black_box;
 
 /// wrap around the original [run_iterator_pass()] to output progress & intermediate results
 pub fn run_iterator_pass_verbosely<'a, _IteratorAlgorithmClosure: Fn(u32) -> u32 + Sync,
@@ -26,23 +28,40 @@ pub fn run_iterator_pass_verbosely<'a, _IteratorAlgorithmClosure: Fn(u32) -> u32
     (pass_result, r)
 }
 
-/// wrap around the original [run_pass()] to output progress & intermediate results
-pub fn run_pass_verbosely<'a, _OutputClosure:    FnMut(&str)>
-                         (result_prefix:  &str,
-                          result_suffix:  &str,
-                          algorithm:      impl FnMut() -> u32,
-                          mut output:     _OutputClosure)
-                         -> (PassResult, u32) {
-    let (pass_result, r) = run_pass(algorithm);
+/// wrap around the original [run_sync_pass()] to output progress & intermediate results
+pub fn run_sync_pass_verbosely<'a, _OutputClosure:    FnMut(&str)>
+                              (result_prefix:  &str,
+                               result_suffix:  &str,
+                               algorithm:      impl FnMut() -> u32,
+                               mut output:     _OutputClosure)
+                              -> (PassResult, u32) {
+    let (pass_result, r) = run_sync_pass(algorithm);
     output(&format!("{}{:?}/{}{}", result_prefix, pass_result.time_measurements, pass_result.space_measurements, result_suffix));
     (pass_result, r)
 }
+
+/// wrap around the original [run_async_pass()] to output progress & intermediate results
+pub async fn run_async_pass_verbosely<AlgorithmPassFn:   FnMut(Option<AlgoDataType>) -> AlgorithmPassFut + Send + Sync,
+                                      AlgorithmPassFut:  Future<Output=AlgoDataType> + Send,
+                                      AlgoDataType:      Send + Sync + Debug>
+                                     (result_prefix:      &str,
+                                      result_suffix:      &str,
+                                      algo_data:          Option<AlgoDataType>,
+                                      algorithm_pass_fn:  AlgorithmPassFn,
+                                      mut output:         impl FnMut(&str))
+                                     -> (PassResult, AlgoDataType) {
+    let (pass_result, algo_data) = run_async_pass(algo_data, algorithm_pass_fn).await;
+    output(&format!("{}{:?}/{}{}", result_prefix, pass_result.time_measurements, pass_result.space_measurements, result_suffix));
+    (pass_result, algo_data)
+}
+
+
 
 /// Runs a pass on the given `iterator_algorithm` callback function or closure,
 /// measuring (and returning) the time it took to run all iterations specified in `range`
 /// -- with the option to run the iteration of the given number of `threads`.\
 /// An `iterator_algorithm` is one that provides 1 element on each call or processes 1 element on each call.\
-/// See [run_pass()] for algorithms which generates or operates on several elements per call.
+/// See [run_sync_pass()] for algorithms which generates or operates on several elements per call.
 /// ```
 ///     /// Iterator Algorithm function under analysis -- receives the iteration number on each call
 ///     /// (for set changing algorithms) or the set size (for constant set algorithms).
@@ -64,7 +83,7 @@ pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync>
                    -> ThreadLoopResult {
         let mut thread_r: u32 = range.end;
 
-        let thread_start = SystemTime::now();
+        let thread_start = Instant::now();
 
         // run 'algorithm()' allowing normal or reversed order
         match algorithm_type {
@@ -92,8 +111,8 @@ pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync>
             },
         }
 
-        let thread_end = SystemTime::now();
-        let thread_duration = thread_end.duration_since(thread_start).unwrap();
+        let thread_end = Instant::now();
+        let thread_duration = thread_end.duration_since(thread_start);
 
         (thread_duration, thread_r)
     }
@@ -141,7 +160,7 @@ pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync>
 
 }
 
-/// Runs a pass on the given `algorithm` callback function or closure,
+/// Runs a pass on the given synchronous `algorithm` callback function or closure,
 /// measuring (and returning) the time it took to run it.\
 /// See [run_iterator_pass()] for algorithms which generates or operates on a single element per call.
 /// ```
@@ -150,13 +169,15 @@ pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync>
 ///     fn algorithm() -> u32 {0}
 /// ```
 /// returns: tuple with ([PassResult]], computed_number: u32)
-pub(crate) fn run_pass(mut algorithm:  impl FnMut() -> u32)
-                      -> (PassResult, u32) {
+///
+/// See also [run_async_pass()]
+pub(crate) fn run_sync_pass(mut algorithm:  impl FnMut() -> u32)
+                           -> (PassResult, u32) {
 
     let allocator_savepoint = features::ALLOC.save_point();
-    let start = SystemTime::now();
+    let start = Instant::now();
     let r = algorithm();
-    let duration = start.elapsed().unwrap();
+    let duration = start.elapsed();
     let allocator_statistics = features::ALLOC.delta_statistics(&allocator_savepoint);
 
     (PassResult {
@@ -170,7 +191,42 @@ pub(crate) fn run_pass(mut algorithm:  impl FnMut() -> u32)
     }, r)
 }
 
-/// contains the measurements for a pass done in [run_pass()]
+/// Runs a pass on the given asynchronous `algorithm` callback function or closure,
+/// measuring (and returning) the time it took to run it.\
+/// See [run_iterator_pass()] for algorithms which generates or operates on a single element per call.
+/// ```nocompile
+///     /// Algorithm function under analysis.
+///     /// Returns a(ny) computed number to avoid compiler call cancellation optimizations
+///     async fn algorithm(algo_data: Option<AlgoDataType>) -> AlgoDataType { ... }
+/// ```
+/// returns: tuple with ([PassResult]], algo_data: `AlgoDataType`)
+///
+/// See also [run_async_pass()]
+pub(crate) async fn run_async_pass<AlgorithmPassFn:   FnMut(Option<AlgoDataType>) -> AlgorithmPassFut + Send + Sync,
+                                   AlgorithmPassFut:  Future<Output=AlgoDataType> + Send,
+                                   AlgoDataType:      Send + Sync + Debug>
+                                  (algo_data:              Option<AlgoDataType>,
+                                   mut algorithm_pass_fn:  AlgorithmPassFn)
+                                  -> (PassResult, AlgoDataType) {
+
+    let allocator_savepoint = features::ALLOC.save_point();
+    let start = Instant::now();
+    let algo_data = black_box(algorithm_pass_fn(algo_data).await);
+    let duration = start.elapsed();
+    let allocator_statistics = features::ALLOC.delta_statistics(&allocator_savepoint);
+
+    (PassResult {
+        time_measurements:  duration,
+        space_measurements: BigOSpacePassMeasurements {
+            used_memory_before: allocator_savepoint.metrics.current_used_memory,
+            used_memory_after:  allocator_statistics.current_used_memory,
+            min_used_memory:    allocator_statistics.min_used_memory,
+            max_used_memory:    allocator_statistics.max_used_memory,
+        },
+    }, algo_data)
+}
+
+/// contains the measurements for a pass done in [run_sync_pass()]
 #[derive(Clone,Copy)]
 pub struct PassResult {
     pub time_measurements:  Duration,

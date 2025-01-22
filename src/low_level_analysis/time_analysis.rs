@@ -77,9 +77,9 @@ mod tests {
 
     //! Unit tests for [time_analysis](super) module
 
-    use std::time::Duration;
     use super::*;
     use crate::features::*;
+    use std::time::Duration;
     use serial_test::serial;
 
 
@@ -165,29 +165,29 @@ mod tests {
         assert("Theoretical O(k^n) algorithm", BigOAlgorithmComplexity::OkN,
                AlgorithmPassesInfo { pass1_n: 10, pass2_n: 70 },
                BigOTimeMeasurements {
-                   pass_1_measurements: Duration::from_micros(1.0e1 as u64),
-                   pass_2_measurements: Duration::from_micros(1.0e7 as u64)
+                   pass_1_measurements: Duration::from_secs_f64(1.0e1),
+                   pass_2_measurements: Duration::from_secs_f64(1.0e7)
                });
 
         assert("O(k^n) algorithm (10% lower than the theoretical value)", BigOAlgorithmComplexity::OkN,
                AlgorithmPassesInfo { pass1_n: 10, pass2_n: 70 },
                BigOTimeMeasurements {
-                   pass_1_measurements: Duration::from_micros(1.0e1 as u64),
-                   pass_2_measurements: Duration::from_micros((1.0e7 * 0.901) as u64)
+                   pass_1_measurements: Duration::from_secs_f64(1.0e1),
+                   pass_2_measurements: Duration::from_secs_f64(1.0e7 * 0.901)
                });
 
         assert("O(k^n) algorithm (10% greater than the theoretical value)", BigOAlgorithmComplexity::OkN,
                AlgorithmPassesInfo { pass1_n: 10, pass2_n: 70 },
                BigOTimeMeasurements {
-                   pass_1_measurements: Duration::from_micros(1.0e1 as u64),
-                   pass_2_measurements: Duration::from_micros((1.0e7 * 1.099) as u64)
+                   pass_1_measurements: Duration::from_secs_f64(1.0e1),
+                   pass_2_measurements: Duration::from_secs_f64(1.0e7 * 1.099)
                });
 
         assert("Worse than exponential algorithm", BigOAlgorithmComplexity::WorseThanExponential,
                AlgorithmPassesInfo { pass1_n: 10, pass2_n: 70 },
                BigOTimeMeasurements {
-                   pass_1_measurements: Duration::from_micros(1.0e1 as u64),
-                   pass_2_measurements: Duration::from_micros((1.0e7 * 1.101) as u64)
+                   pass_1_measurements: Duration::from_secs_f64(1.0e1),
+                   pass_2_measurements: Duration::from_secs_f64(1.0e7 * 1.101)
                });
 
     }

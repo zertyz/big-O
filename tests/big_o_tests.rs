@@ -5,8 +5,9 @@ use std::{
     sync::Arc,
     collections::HashMap,
 };
+use std::time::Duration;
 use ctor::ctor;
-
+use big_o_test::api::RegularAsyncAnalyzerBuilder;
 
 #[cfg(debug_assertions)]
 /// loop multiplier for debug compilation
@@ -53,7 +54,6 @@ fn quick_sort_reversed_vec() {
             vec2[14]
         },
         BigOAlgorithmComplexity::ON, BigOAlgorithmComplexity::ON,
-        &TimeUnits::MICROSECOND
     )
 }
 
@@ -92,8 +92,7 @@ fn vec_best_case_algorithm_analysis() {
                 vec.pop().unwrap()
             }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
             25, iterations_per_pass, iterations_per_pass, iterations_per_pass, iterations_per_pass,
-            n_threads, n_threads, n_threads, n_threads,
-            &TimeUnits::MICROSECOND);
+            n_threads, n_threads, n_threads, n_threads);
 }
 
 /// Attests the worst case CRUD for vectors:
@@ -134,8 +133,7 @@ fn vec_worst_case_algorithm_analysis() {
                vec.remove(0)
            }, BigOAlgorithmComplexity::ON, BigOAlgorithmComplexity::O1,
            0, iterations_per_pass, iterations_per_pass*10, iterations_per_pass*10, iterations_per_pass,
-           n_threads, n_threads, n_threads, n_threads,
-           &TimeUnits::MICROSECOND);
+           n_threads, n_threads, n_threads, n_threads);
 }
 
 /// Attests O(1) performance characteristics for HashMaps
@@ -177,6 +175,13 @@ fn hashmap_algorithm_analysis() {
                hashmap.remove(&key).unwrap_or_default()
            }, BigOAlgorithmComplexity::O1, BigOAlgorithmComplexity::O1,
            20, iterations_per_pass, iterations_per_pass, iterations_per_pass, iterations_per_pass,
-           n_threads, n_threads, n_threads, n_threads,
-           &TimeUnits::MICROSECOND);
+           n_threads, n_threads, n_threads, n_threads);
+}
+
+#[tokio::test]
+async fn dummy_async_test() {
+    RegularAsyncAnalyzerBuilder::new("dummy analysis")
+        .first_pass(10, |_: Option<()>| tokio::time::sleep(Duration::from_millis(100)))
+        .second_pass(20, |_: Option<()>| tokio::time::sleep(Duration::from_millis(200)))
+        .test_algorithm().await;
 }

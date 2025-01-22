@@ -29,8 +29,7 @@ pub fn test_set_resizing_iterator_algorithm() {}
 /// Runs [analyse_algorithm()], trying to match the given maximum time & space complexities to the ones observed in runtime when running the algorithm
 /// -- retrying as much as `max_retry_attempts` to avoid flaky test results.\
 /// /// In case of rejection, a detailed run log with measurements & analysis results is issued.
-pub fn test_algorithm<ScalarDuration: TryInto<u64> + Copy>
-                     (test_name:                 &str,
+pub fn test_algorithm(test_name:                 &str,
                       max_retry_attempts:        u32,
                       mut reset_fn:              impl FnMut(),
                       pass1_set_size:            u32,
@@ -66,9 +65,9 @@ fn analyse_algorithm(test_name:                 &str,
                     -> RetryProducerResult<String, String> {
 
     OUTPUT(&format!("Running '{}' algorithm:\n", test_name));
-    let (_reset_pass_result,                   r0) = run_pass_verbosely("  Resetting: ", "", || {reset_fn(); 0}, OUTPUT);
-    let (pass1_result, r1) = run_pass_verbosely("; Pass 1: ", "", pass1_algorithm, OUTPUT);
-    let (pass2_result, r2) = run_pass_verbosely("; Pass 2: ", "", pass2_algorithm, OUTPUT);
+    let (_reset_pass_result,                   r0) = run_sync_pass_verbosely("  Resetting: ", "", || {reset_fn(); 0}, OUTPUT);
+    let (pass1_result, r1) = run_sync_pass_verbosely("; Pass 1: ", "", pass1_algorithm, OUTPUT);
+    let (pass2_result, r2) = run_sync_pass_verbosely("; Pass 2: ", "", pass2_algorithm, OUTPUT);
     let measurements = AlgorithmMeasurements {
         measurement_name: test_name,
         passes_info: AlgorithmPassesInfo {
