@@ -39,7 +39,7 @@ no_allocator_metrics = []      # If you don't want to change the global allocato
 
 [dependencies]
 once_cell = "1.20"
-tokio     = { version = "1", features = ["rt", "time", "macros"] }
+tokio     = { version = "1", default-features = false, features = ["rt", "time", "macros"] }
 keen-retry = "0.5"                                 # for automatic retries on flaky execution passes
 crossbeam = "0.8"                        # scoped threads
 
