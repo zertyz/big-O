@@ -7,7 +7,7 @@ use std::{
 };
 use std::time::Duration;
 use ctor::ctor;
-use big_o_test::api::RegularAsyncAnalyzerBuilder;
+use big_o_test::RegularAsyncAnalyzerBuilder;
 
 #[cfg(debug_assertions)]
 /// loop multiplier for debug compilation

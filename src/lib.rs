@@ -1,7 +1,8 @@
 #![doc = include_str!("../README.md")]
 
 
-pub mod api;
+mod api;
+pub use api::*;
 pub mod runners;
 pub mod low_level_analysis;
 pub mod metrics_allocator;

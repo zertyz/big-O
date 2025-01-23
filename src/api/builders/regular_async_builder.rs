@@ -107,17 +107,30 @@ RegularAsyncAnalyzerBuilder<FirstPassFn, FirstPassFut, SecondPassFn, SecondPassF
         };
 
         // execute the 2 passes + any assertions
+        ////////////////////////////////////////
         // TODO: the custom measurements are missing from here -- see "test_run()" for more info
+        
         let first_pass_fn = self.first_pass_fn.as_mut().expect("BUG! First pass function not present");
         let second_pass_fn = self.second_pass_fn.as_mut().expect("BUG! Second pass function not present");
+
         // pass 1
         let (pass1_result, algo_data) = run_async_pass_verbosely("  Pass 1: ", ";", algo_data, first_pass_fn, OUTPUT).await;
         // assertions on pass 1 data
         if let Some(ref mut first_pass_assertion_fn) = self.first_pass_assertion_fn {
             first_pass_assertion_fn(&algo_data).await;
         }
+
+        // in-between passes reset
+        let algo_data = match &mut self.reset_fn {
+            Some(reset_fn) => {
+                let (_reset_pass_result, algo_data) = run_async_pass_verbosely("  In-between-passes Reset: ", ";", Some(algo_data), reset_fn, OUTPUT).await;
+                Some(algo_data)         // algo data after reset
+            },
+            None => Some(algo_data),    // pristine algo data returned by the first pass
+        };
+        
         // pass 2
-        let (pass2_result, algo_data) = run_async_pass_verbosely("  Pass 2: ", "", Some(algo_data), second_pass_fn, OUTPUT).await;
+        let (pass2_result, algo_data) = run_async_pass_verbosely("  Pass 2: ", "", algo_data, second_pass_fn, OUTPUT).await;
         // assertions on pass 2 data
         if let Some(ref mut second_pass_assertion_fn) = self.second_pass_assertion_fn {
             second_pass_assertion_fn(&algo_data).await;
