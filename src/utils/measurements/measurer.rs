@@ -12,7 +12,7 @@ use crate::utils::measurements::presentable_measurements::PresentableMeasurement
 /// See [CustomMeasurer] for more info.
 pub async fn measure_all_before_event<AlgoDataType: Send + Sync + Debug>
                                      (algo_data:                 Option<&AlgoDataType>,
-                                      measurements_executors:    &mut Vec<Box<dyn CustomMeasurerExecutor<AlgoDataType>>>) {
+                                      measurements_executors:    &mut Vec<Box<dyn CustomMeasurerExecutor<AlgoDataType> + Send>>) {
     // measure in reversed order
     for measurement_executors in measurements_executors.iter_mut().rev() {
         measurement_executors.measure_before_event(algo_data).await;
@@ -23,7 +23,7 @@ pub async fn measure_all_before_event<AlgoDataType: Send + Sync + Debug>
 /// See [CustomMeasurer] for more info.
 pub async fn measure_all_after_event<AlgoDataType: Send + Sync + Debug>
                                     (algo_data:                 Option<&AlgoDataType>,
-                                     measurements_executors:    &mut Vec<Box<dyn CustomMeasurerExecutor<AlgoDataType>>>)
+                                     measurements_executors:    &mut Vec<Box<dyn CustomMeasurerExecutor<AlgoDataType> + Send>>)
                                      -> Vec<CustomMeasurement> {
     let mut measurements = vec![];
     for measurement_executors in measurements_executors.iter_mut() {

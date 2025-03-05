@@ -47,7 +47,7 @@ pub struct RegularAsyncAnalyzerBuilder<FirstPassFn:   FnMut(Option<AlgoDataType>
 
     /// Measurements are done in a "delta" fashion.
     /// For details, see [Self::add_custom_measurement()].
-    custom_measurers: Vec<Box<dyn CustomMeasurerExecutor<AlgoDataType>>>,
+    custom_measurers: Vec<Box<dyn CustomMeasurerExecutor<AlgoDataType> + Send>>,
 }
 
 

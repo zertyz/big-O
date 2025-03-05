@@ -180,8 +180,13 @@ fn hashmap_algorithm_analysis() {
 
 #[tokio::test]
 async fn dummy_async_test() {
-    RegularAsyncAnalyzerBuilder::new("dummy analysis")
+}
+
+#[tokio::test]
+async fn async_futures_are_send() {
+    let fut =     RegularAsyncAnalyzerBuilder::new("dummy analysis")
         .first_pass(10, |_: Option<()>| tokio::time::sleep(Duration::from_millis(100)))
         .second_pass(20, |_: Option<()>| tokio::time::sleep(Duration::from_millis(200)))
-        .test_algorithm().await;
+        .test_algorithm();  // notice no .await here, so we get the raw `Future`
+    tokio::task::spawn(fut).await.expect("Tokio Error");
 }
