@@ -7,7 +7,6 @@ use std::{
 };
 use std::time::Duration;
 use ctor::ctor;
-use big_o_test::RegularAsyncAnalyzerBuilder;
 
 #[cfg(debug_assertions)]
 /// loop multiplier for debug compilation
@@ -178,13 +177,10 @@ fn hashmap_algorithm_analysis() {
            n_threads, n_threads, n_threads, n_threads);
 }
 
-#[tokio::test]
-async fn dummy_async_test() {
-}
-
+#[cfg(feature = "async")]
 #[tokio::test]
 async fn async_futures_are_send() {
-    let fut =     RegularAsyncAnalyzerBuilder::new("dummy analysis")
+    let fut = big_o_test::RegularAsyncAnalyzerBuilder::new("dummy analysis")
         .first_pass(10, |_: Option<()>| tokio::time::sleep(Duration::from_millis(100)))
         .second_pass(20, |_: Option<()>| tokio::time::sleep(Duration::from_millis(200)))
         .test_algorithm();  // notice no .await here, so we get the raw `Future`

@@ -32,6 +32,12 @@ pub const OUTPUT: fn(&str) = null_write;
 ///       have a feature in your project to only include this crate if you are compiling for integration tests
 pub static ALLOC: MetricsAllocator<SAVE_POINT_RING_BUFFER_SIZE> = MetricsAllocator::new();
 
+#[cfg(feature = "no_allocator_metrics")]
+/// The global Rust allocator is not set -- however this is still exposed to the rest of the code
+/// so it works regardless -- but all space measurements will be ZERO and the asymptotic space analysis will be wrong
+pub static ALLOC: MetricsAllocator<SAVE_POINT_RING_BUFFER_SIZE> = MetricsAllocator::new();
+
+
 /// Regarding the [MetricsAllocator] used for space complexity analysis, this property specifies the maximum number of "save points"
 /// that might be in use at the same time
 pub const SAVE_POINT_RING_BUFFER_SIZE: usize = 1024;

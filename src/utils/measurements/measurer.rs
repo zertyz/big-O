@@ -159,7 +159,8 @@ mod tests {
     use std::future;
     use std::ops::Add;
     use std::time::{Duration, Instant};
-    
+
+    #[cfg(feature = "async")]
     #[tokio::test]
     async fn test_custom_measurer() {
         let expected_elapsed_seconds = 38.46;

@@ -17,35 +17,9 @@ Issues contain a *prefix* letter and a sequence number, possibly followed by a d
 
 # Being-Done
 
-**(n1)** 2025-01-09: Redo our API (for v1.0), using the builder pattern, to match the following sketch:
-```
-big_o::analyse_regular_async_algorithm()
-  .with_warmup(|| async {...})
-  .with_max_reattempts_per_pass(2)
-  .with_reset_fn(|| async {...})
-  .first_pass(n_elements, |n_elements| async {...} -> data)
-  .first_pass_assertions(|data| async {...})
-  .second_pass(n_elements, |n_elements| async {...} -> data)
-  .second_pass_assertions(|data| async {...})
-  .with_time_measurements(BigOThings::On)
-  .with_space_measurements(BigOThings::O1)
-  .with_auxiliary_space_measurements(BigOThings::On)
-  .add_custom_measurement("Δconn", BigOThing::O1, "total connections opened", ValueRepresentation::Unit, |data| ... -> val)
-  .add_custom_measurement_with_averages("Δcalls", BigOThing::O1, "total external service calls made", ValueRepresentation::Scientific, |data| ... -> val)
-```
-* Maybe an additional method may be provided to inform the time measurement function -- defaulting to `Instant::now()`
-* Since this is meant to be run in tests, the closures do not return a `Result<>`. Closures must panic if an error happen -- as tests do
-  -- by adding `.unwrap()` or `.expect()` to fallible operations.
-  (In the future we might provide the `try_*` variations for the closures, if this crate would ever be run outside tests).
-  (If this would ever happen, please see commit 0ff3a232dda13cb2752e872bb7f1ed8bca1dd1b4:src/api/builder.rs:26).
-* Note both the builder and the runner might fail due to sanity check violations in addition to the provided assertions:
-  1) n is the same for the 1st and 2nd passes -- or even smaller on the 2nd pass... or not "big enough"
-  2) no measurements were specified -- no time, space, auxiliary space nor any custom measurements 
-  3) memory measurements are inconsistent between re-attempts (when the difference is "considerably large")
-  4) the memory didn't return to the same value after everything was freed -- either a memory leak, caching or concurrent tests are running
-
 
 # Backlog
+
 
 **(f2)** 2025-01-09: After **(n1)**, redo our reports to match the following sketch:
 ```
@@ -88,3 +62,36 @@ Things to notice:
 
 
 # Done
+
+
+**(n1)** 2025-01-09: Redo our API (for v1.0), using the builder pattern, to match the following sketch:
+```
+big_o::analyse_regular_async_algorithm()
+  .with_warmup(|| async {...})
+  .with_max_reattempts_per_pass(2)
+  .with_reset_fn(|| async {...})
+  .first_pass(n_elements, |n_elements| async {...} -> data)
+  .first_pass_assertions(|data| async {...})
+  .second_pass(n_elements, |n_elements| async {...} -> data)
+  .second_pass_assertions(|data| async {...})
+  .with_time_measurements(BigOThings::On)
+  .with_space_measurements(BigOThings::O1)
+  .with_auxiliary_space_measurements(BigOThings::On)
+  .add_custom_measurement("Δconn", BigOThing::O1, "total connections opened", ValueRepresentation::Unit, |data| ... -> val)
+  .add_custom_measurement_with_averages("Δcalls", BigOThing::O1, "total external service calls made", ValueRepresentation::Scientific, |data| ... -> val)
+```
+* Maybe an additional method may be provided to inform the time measurement function -- defaulting to `Instant::now()`
+* Since this is meant to be run in tests, the closures do not return a `Result<>`. Closures must panic if an error happen -- as tests do
+  -- by adding `.unwrap()` or `.expect()` to fallible operations.
+  (In the future we might provide the `try_*` variations for the closures, if this crate would ever be run outside tests).
+  (If this would ever happen, please see commit 0ff3a232dda13cb2752e872bb7f1ed8bca1dd1b4:src/api/builder.rs:26).
+* Note both the builder and the runner might fail due to sanity check violations in addition to the provided assertions:
+  1) n is the same for the 1st and 2nd passes -- or even smaller on the 2nd pass... or not "big enough"
+  2) no measurements were specified -- no time, space, auxiliary space nor any custom measurements
+  3) memory measurements are inconsistent between re-attempts (when the difference is "considerably large")
+  4) the memory didn't return to the same value after everything was freed -- either a memory leak, caching or concurrent tests are running
+
+
+**(n3)&& 2026-03-15: Fix the bug to have this crate not set set a global allocator -- so it can play nicely with other memory profilers like `dhat`
+Currently, there indeed exist a `no_allocator_metrics`, but compilation fails if it is being used :(.
+Also, take the opportunity to make `tokio` feature-dependent on the `async` feature -- present in the default features listing.

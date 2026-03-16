@@ -16,6 +16,7 @@ license       = "Unlicense"
 default = [
     "report_stdout",           # Shows the algorithm analysis report for each test -- sending to stdout. Use `no_report` if you don't want it or `report_stderr` to leave stdout alone
     "tolerance_10_percent",    # Accepts measurement discrepancies of up to 10% -- for machines not performing any other work other than running the tests
+    "async",                   # Enables async APIs and `tokio` dependency
 ]
 
 # Report generation options
@@ -32,16 +33,17 @@ tolerance_25_percent = []      # Accepts measurement discrepancies of up to 25% 
 # Misc
 no_allocator_metrics = []      # If you don't want to change the global allocator (injecting our metrics probe in it), use this feature
                                # -- however, there will be no SPACE analysis
+async = ["tokio"]   # Enables tokio & async APIs
 
 
 [workspace]
 
 
 [dependencies]
-once_cell = "1.20"
-tokio     = { version = "1", default-features = false, features = ["rt", "time", "macros"] }
+once_cell  = "1"
+tokio      = { version = "1", default-features = false, features = ["rt", "time", "macros"], optional = true }
 keen-retry = "0.5"                                 # for automatic retries on flaky execution passes
-crossbeam = "0.8"                        # scoped threads
+crossbeam  = "0.8"                        # scoped threads
 
 
 [dev-dependencies]      # dev dependencies should become normal dependencies when building docs for tests
