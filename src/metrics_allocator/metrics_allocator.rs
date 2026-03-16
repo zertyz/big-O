@@ -1,6 +1,6 @@
 //! See [super]
 
-use std::fmt::{Formatter, Display};
+use std::fmt::{Formatter, Display, Debug};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::alloc::{System, GlobalAlloc, Layout};
 
@@ -51,6 +51,16 @@ impl Display for MetricsAllocatorStatistics<AtomicUsize> {
 impl Display for MetricsAllocatorStatistics<usize> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.fmt(self, f)
+    }
+}
+impl Debug for MetricsAllocatorStatistics<AtomicUsize> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+impl Debug for MetricsAllocatorStatistics<usize> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
     }
 }
 
@@ -368,9 +378,9 @@ mod tests {
         assert_current_min_and_max_memory(&save_point1, 33333, 0,     99999);
 
         // debug info
-        eprintln!("Final metrics for 'save_point1': {}", allocator.delta_statistics(&save_point1).expect("delta_statistics() failed"));
-        eprintln!("Final metrics for 'save_point2': {}", allocator.delta_statistics(&save_point2).expect("delta_statistics() failed"));
-        eprintln!("Final metrics for 'save_point3': {}", allocator.delta_statistics(&save_point3).expect("delta_statistics() failed"));
-        eprintln!("Final metrics for 'save_point4': {}", allocator.delta_statistics(&save_point4).expect("delta_statistics() failed"));
+        eprintln!("Final metrics for 'save_point1': {:?}", allocator.delta_statistics(&save_point1));
+        eprintln!("Final metrics for 'save_point2': {:?}", allocator.delta_statistics(&save_point2));
+        eprintln!("Final metrics for 'save_point3': {:?}", allocator.delta_statistics(&save_point3));
+        eprintln!("Final metrics for 'save_point4': {:?}", allocator.delta_statistics(&save_point4));
     }
 }
