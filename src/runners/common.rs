@@ -144,17 +144,34 @@ pub(crate) fn run_iterator_pass<'a, _AlgorithmClosure: Fn(u32) -> u32 + Sync>
             r ^= thread_r;
         }
 
-        let allocator_statistics = features::ALLOC.delta_statistics(&allocator_savepoint);
+        let time_measurements = Duration::from_secs_f64(elapsed_seconds_average);
 
-        (PassResult {
-            time_measurements:  Duration::from_secs_f64(elapsed_seconds_average),
-            space_measurements: BigOSpacePassMeasurements {
+        let space_measurements = match features::ALLOC.delta_statistics(&allocator_savepoint) {
+            Ok(allocator_statistics) => BigOSpacePassMeasurements {
                 used_memory_before: allocator_savepoint.metrics.current_used_memory,
                 used_memory_after:  allocator_statistics.current_used_memory,
                 min_used_memory:    allocator_statistics.min_used_memory,
                 max_used_memory:    allocator_statistics.max_used_memory,
             },
-        }, r)
+            Err(_err) => {
+                // in case of error (number of slots is too little), we purposely make it clear that the statistics are messed up
+                // -- as, currently, we have no way reporting errors... therefore, this sentinel value is used
+                BigOSpacePassMeasurements {
+                    used_memory_before: usize::MIN,
+                    used_memory_after:  usize::MAX,
+                    min_used_memory:    usize::MIN,
+                    max_used_memory:    usize::MAX,
+                }
+            }
+        };
+
+        (
+            PassResult {
+                time_measurements,
+                space_measurements,
+            },
+            r
+        )
 
     }).unwrap()
 
@@ -177,18 +194,34 @@ pub(crate) fn run_sync_pass(mut algorithm:  impl FnMut() -> u32)
     let allocator_savepoint = features::ALLOC.save_point();
     let start = Instant::now();
     let r = algorithm();
-    let duration = start.elapsed();
-    let allocator_statistics = features::ALLOC.delta_statistics(&allocator_savepoint);
-
-    (PassResult {
-        time_measurements:  duration,
-        space_measurements: BigOSpacePassMeasurements {
+    let time_measurements = start.elapsed();
+    let space_measurements = match features::ALLOC.delta_statistics(&allocator_savepoint) {
+        Ok(allocator_statistics) => BigOSpacePassMeasurements {
             used_memory_before: allocator_savepoint.metrics.current_used_memory,
             used_memory_after:  allocator_statistics.current_used_memory,
             min_used_memory:    allocator_statistics.min_used_memory,
             max_used_memory:    allocator_statistics.max_used_memory,
         },
-    }, r)
+        Err(_err) => {
+            // in case of error (number of slots is too little), we purposely make it clear that the statistics are messed up
+            // -- as, currently, we have no way reporting errors... therefore, this sentinel value is used
+            BigOSpacePassMeasurements {
+                used_memory_before: usize::MIN,
+                used_memory_after:  usize::MAX,
+                min_used_memory:    usize::MIN,
+                max_used_memory:    usize::MAX,
+            }
+        }
+    };
+
+    (
+        PassResult {
+            time_measurements,
+            space_measurements,
+        },
+        r
+    )
+
 }
 
 /// Runs a pass on the given asynchronous `algorithm` callback function or closure,
@@ -213,17 +246,32 @@ pub(crate) async fn run_async_pass<AlgorithmPassFn:   FnMut(Option<AlgoDataType>
     let start = Instant::now();
     let algo_data = black_box(algorithm_pass_fn(algo_data).await);
     let duration = start.elapsed();
-    let allocator_statistics = features::ALLOC.delta_statistics(&allocator_savepoint);
-
-    (PassResult {
-        time_measurements:  duration,
-        space_measurements: BigOSpacePassMeasurements {
-            used_memory_before: allocator_savepoint.metrics.current_used_memory,
-            used_memory_after:  allocator_statistics.current_used_memory,
-            min_used_memory:    allocator_statistics.min_used_memory,
-            max_used_memory:    allocator_statistics.max_used_memory,
-        },
-    }, algo_data)
+    match features::ALLOC.delta_statistics(&allocator_savepoint) {
+        Ok(allocator_statistics) => {
+            (PassResult {
+                time_measurements:  duration,
+                space_measurements: BigOSpacePassMeasurements {
+                    used_memory_before: allocator_savepoint.metrics.current_used_memory,
+                    used_memory_after:  allocator_statistics.current_used_memory,
+                    min_used_memory:    allocator_statistics.min_used_memory,
+                    max_used_memory:    allocator_statistics.max_used_memory,
+                },
+            }, algo_data)
+        }
+        Err(_err) => {
+            // in case of error (number of slots is too little), we purposely make it clear that the statistics are messed up
+            // -- as, currently, we have no way reporting errors... therefore, this sentinel value is used
+            (PassResult {
+                time_measurements:  duration,
+                space_measurements: BigOSpacePassMeasurements {
+                    used_memory_before: usize::MIN,
+                    used_memory_after:  usize::MAX,
+                    min_used_memory:    usize::MIN,
+                    max_used_memory:    usize::MAX,
+                },
+            }, algo_data)
+        }
+    }
 }
 
 /// contains the measurements for a pass done in [run_sync_pass()]

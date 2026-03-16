@@ -92,6 +92,8 @@ big_o::analyse_regular_async_algorithm()
   4) the memory didn't return to the same value after everything was freed -- either a memory leak, caching or concurrent tests are running
 
 
-**(n3)&& 2026-03-15: Fix the bug to have this crate not set set a global allocator -- so it can play nicely with other memory profilers like `dhat`
+**(n3)** 2026-03-15: Fix the bug to have this crate not set set a global allocator -- so it can play nicely with other memory profilers like `dhat`
 Currently, there indeed exist a `no_allocator_metrics`, but compilation fails if it is being used :(.
 Also, take the opportunity to make `tokio` feature-dependent on the `async` feature -- present in the default features listing.
+
+**(r4)** 2026-03-16: Improve the metrics allocation for external usage detaching. Specifically treat error conditions and avoid the possibilities of panics

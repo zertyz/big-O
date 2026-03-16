@@ -13,7 +13,7 @@
 //!    use crate::big_o_test::ALLOC;
 //!     let save_point = ALLOC.save_point();
 //!     let _vec = Vec::<u32>::with_capacity(1024);
-//!     let metrics = ALLOC.delta_statistics(&save_point);
+//!     let metrics = ALLOC.delta_statistics(&save_point).expect("Ran out of save point slots. Increase it.");
 //!     println!("Allocator Metrics for the Vec allocation: {}", metrics);
 
 mod metrics_allocator;

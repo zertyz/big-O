@@ -4,7 +4,7 @@ use std::fmt::{Formatter, Display};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::alloc::{System, GlobalAlloc, Layout};
 
-use crate::metrics_allocator::ring_buffer::{RingBuffer, RingBufferConsumer};
+use crate::metrics_allocator::ring_buffer::{RingBuffer, RingBufferConsumer, RingBufferOverflowError};
 
 /// struct returned by [MetricsAllocator::delta_statistics()]
 pub struct MetricsAllocatorStatistics<NumericType> {
@@ -160,11 +160,11 @@ impl<const RING_BUFFER_SIZE: usize> MetricsAllocator<'_, RING_BUFFER_SIZE> {
 
     /// Returns the allocation statistics between now and the point in time when `save_point` was generated
     /// (with a call to [save_point()](MetricsAllocator::save_point())).
-    pub fn delta_statistics(&self, save_point: &MetricsAllocatorSavePoint<RING_BUFFER_SIZE>) -> MetricsAllocatorStatistics<usize> {
+    pub fn delta_statistics(&self, save_point: &MetricsAllocatorSavePoint<RING_BUFFER_SIZE>) -> Result<MetricsAllocatorStatistics<usize>, RingBufferOverflowError> {
         let mut min = usize::MAX;
         let mut max = usize::MIN;
         // compute (min,max) since the given 'save_point'
-        for peeked_chunk in save_point.used_memory_ring_buffer_consumer.peek_all().unwrap() {
+        for peeked_chunk in save_point.used_memory_ring_buffer_consumer.peek_all()? {
             for subsequent_save_point in peeked_chunk {
                 min = min.min(subsequent_save_point.min_used_memory);
                 max = max.max(subsequent_save_point.max_used_memory);
@@ -173,7 +173,7 @@ impl<const RING_BUFFER_SIZE: usize> MetricsAllocator<'_, RING_BUFFER_SIZE> {
         // compute the current (min,max)
         min = min.min(self.statistics.min_used_memory.load(Ordering::Relaxed));
         max = max.max(self.statistics.max_used_memory.load(Ordering::Relaxed));
-        MetricsAllocatorStatistics::<usize> {
+        Ok(MetricsAllocatorStatistics::<usize> {
             allocations_count:           self.statistics.allocations_count          .load(Ordering::Relaxed) - save_point.metrics.allocations_count,
             deallocations_count:         self.statistics.deallocations_count        .load(Ordering::Relaxed) - save_point.metrics.deallocations_count,
             zeroed_allocations_count:    self.statistics.zeroed_allocations_count   .load(Ordering::Relaxed) - save_point.metrics.zeroed_allocations_count,
@@ -186,7 +186,7 @@ impl<const RING_BUFFER_SIZE: usize> MetricsAllocator<'_, RING_BUFFER_SIZE> {
             current_used_memory:         self.statistics.current_used_memory        .load(Ordering::Relaxed),
             min_used_memory:             min,
             max_used_memory:             max,
-        }
+        })
     }
 
     /// compute metrics for allocation
@@ -289,7 +289,8 @@ mod tests {
         use crate::features::ALLOC;
         let save_point = ALLOC.save_point();
         let _vec = Vec::<u32>::with_capacity(1024);
-        let metrics = ALLOC.delta_statistics(&save_point);
+        let metrics = ALLOC.delta_statistics(&save_point)
+            .expect("delta_statistics() failed");
         println!("Allocator Metrics for the Vec allocation: {}", metrics);
     }
 
@@ -309,7 +310,8 @@ mod tests {
         };
 
         let assert_current_min_and_max_memory = |save_point, expected_used_mem, expected_min_mem, expected_max_mem| {
-            let metrics = allocator.delta_statistics(save_point);
+            let metrics = allocator.delta_statistics(save_point)
+                .expect("delta_statistics() failed");
             assert_eq!(metrics.current_used_memory, expected_used_mem, "wrong used memory metrics");
             assert_eq!(metrics.min_used_memory,     expected_min_mem,  "wrong min memory metrics");
             assert_eq!(metrics.max_used_memory,     expected_max_mem,  "wrong max memory metrics");
@@ -366,9 +368,9 @@ mod tests {
         assert_current_min_and_max_memory(&save_point1, 33333, 0,     99999);
 
         // debug info
-        eprintln!("Final metrics for 'save_point1': {}", allocator.delta_statistics(&save_point1));
-        eprintln!("Final metrics for 'save_point2': {}", allocator.delta_statistics(&save_point2));
-        eprintln!("Final metrics for 'save_point3': {}", allocator.delta_statistics(&save_point3));
-        eprintln!("Final metrics for 'save_point4': {}", allocator.delta_statistics(&save_point4));
+        eprintln!("Final metrics for 'save_point1': {}", allocator.delta_statistics(&save_point1).expect("delta_statistics() failed"));
+        eprintln!("Final metrics for 'save_point2': {}", allocator.delta_statistics(&save_point2).expect("delta_statistics() failed"));
+        eprintln!("Final metrics for 'save_point3': {}", allocator.delta_statistics(&save_point3).expect("delta_statistics() failed"));
+        eprintln!("Final metrics for 'save_point4': {}", allocator.delta_statistics(&save_point4).expect("delta_statistics() failed"));
     }
 }
